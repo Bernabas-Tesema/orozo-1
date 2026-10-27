@@ -1,0 +1,9 @@
+{
+  "name": "Ethiopian Language Interpretation Platform",
+  "description": "Secure, institutional-grade human language interpretation coordination and call center platform for Ethiopian public services, healthcare, and legal sectors.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
