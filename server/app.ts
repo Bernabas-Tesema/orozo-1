@@ -17,18 +17,68 @@ function searchWithoutCatchAll(search: string) {
   if (!search) return '';
   const params = new URLSearchParams(search.slice(1));
   params.delete('path');
+  params.delete('__path');
   const rest = params.toString();
   return rest ? `?${rest}` : '';
 }
 
+function isMountedApiPath(pathname: string) {
+  return (
+    pathname === '/api/health' ||
+    pathname.startsWith('/api/health/') ||
+    pathname === '/api/v1' ||
+    pathname.startsWith('/api/v1/')
+  );
+}
+
+function catchAllSegments(req: Request): string[] | null {
+  const queryPath = req.query?.__path ?? req.query?.path;
+  if (Array.isArray(queryPath)) {
+    const segments = queryPath.map(String).flatMap((part) => part.split('/')).filter(Boolean);
+    return segments.length ? segments : null;
+  }
+  if (typeof queryPath === 'string' && queryPath) {
+    const segments = queryPath.split('/').filter(Boolean);
+    return segments.length ? segments : null;
+  }
+  return null;
+}
+
+function forwardedApiUrl(req: Request): string | null {
+  const headerNames = [
+    'x-forwarded-uri',
+    'x-invoke-path',
+    'x-original-url',
+    'x-vercel-original-url',
+    'x-rewrite-url',
+  ];
+  for (const name of headerNames) {
+    const value = req.header(name);
+    if (!value) continue;
+    const raw = value.trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      try {
+        const url = new URL(raw);
+        if (url.pathname.startsWith('/api/')) return `${url.pathname}${url.search}`;
+      } catch {
+        continue;
+      }
+    } else if (raw.startsWith('/api/')) {
+      return raw;
+    }
+  }
+  return null;
+}
+
 /**
- * Vercel’s catch-all may hand Express either the original `/api/...` URL
- * or only the segments after `/api`. Route matching expects `/api/v1/...`.
+ * Vercel rewrites every `/api/*` request onto the single `api/index` function.
+ * Express may then see the original `/api/v1/...` URL, only `/api`, or the
+ * remainder in `__path`. Route matching expects `/api/v1/...`.
  */
 function normalizeApiUrl(req: Request) {
   const { pathname: rawPath, search } = splitUrl(req.url || '/');
   const pathname = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
-  if (pathname === '/api' || pathname.startsWith('/api/')) return;
+  if (isMountedApiPath(pathname)) return;
 
   const cleanSearch = searchWithoutCatchAll(search);
 
@@ -42,15 +92,17 @@ function normalizeApiUrl(req: Request) {
     return;
   }
 
-  const queryPath = req.query?.path;
-  const segments = Array.isArray(queryPath)
-    ? queryPath.map(String)
-    : typeof queryPath === 'string' && queryPath
-      ? [queryPath]
-      : null;
-
-  if (segments && pathname === '/') {
+  const stripped =
+    pathname === '/' || pathname === '/api' || pathname === '/api/index';
+  const segments = catchAllSegments(req);
+  if (segments && stripped) {
     req.url = `/api/${segments.join('/')}${cleanSearch}`;
+    return;
+  }
+
+  const forwarded = forwardedApiUrl(req);
+  if (forwarded && stripped) {
+    req.url = forwarded;
   }
 }
 
