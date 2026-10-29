@@ -1,0 +1,9 @@
+{
+  "id": "legal_court",
+  "title": "Courts",
+  "titleAm": "ፍርድ ቤት",
+  "typicalUrgency": "high",
+  "summary": "Hearings, testimony, and registry desks. Ask for a sworn interpreter when the proceeding is formal.",
+  "practiceNote": "Video is the usual mode for a hearing. Unknown dialects go to a coordinator.",
+  "cover": "cover.jpg"
+}
