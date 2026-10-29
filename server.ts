@@ -1,29 +1,34 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import apiRouter from './server/routes';
+import { createApiApp } from './server/app';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
+  const app = createApiApp();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
 
-  app.use(express.json());
-
-  // Mount API v1 router
-  app.use('/api/v1', apiRouter);
-
-  // Health check endpoint
-  app.get('/api/health', (_req, res) => {
-    res.json({
-      status: 'healthy',
-      platform: 'Ethiopian Language Interpretation Platform',
-      version: '1.0.0-draft',
-      time: new Date().toISOString(),
-    });
+  // Django client API: organization registration and interpreter records.
+  // Local only. Vercel cannot reach a Django process on this machine.
+  app.use('/django-api', async (req, res) => {
+    const target = `http://127.0.0.1:8000${req.originalUrl.replace(/^\/django-api/, '')}`;
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const accountId = req.header('x-account-id');
+      if (accountId) headers['X-Account-Id'] = accountId;
+      const response = await fetch(target, {
+        method: req.method,
+        headers,
+        body: req.method === 'GET' || req.method === 'HEAD' ? undefined : JSON.stringify(req.body ?? {}),
+      });
+      const text = await response.text();
+      res.status(response.status).type('application/json').send(text);
+    } catch {
+      res.status(502).json({ error: 'The ORZO Django API is not running on port 8000.' });
+    }
   });
 
   if (!isProd) {
