@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 const HASAB_API_KEY = process.env.HASAB_API_KEY || 'HASAB_KEY_sWpgYcotkhJb91PIKi8JZgdIRHtOaT';
 const HASAB_ENDPOINT = 'https://api.hasab.ai/api/v1/chat';
 
@@ -91,6 +89,7 @@ export async function askOrzoSupport(userMessage: string, chatHistory: ChatMessa
   // 2. Fallback to Gemini API if GEMINI_API_KEY is present
   if (process.env.GEMINI_API_KEY) {
     try {
+      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI();
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -191,6 +190,7 @@ export async function identifyAudioLanguage(
   // If live mic audio was captured and we have Gemini available for multimodal analysis:
   if (audioBase64 && process.env.GEMINI_API_KEY) {
     try {
+      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI();
       const prompt = `Analyze this spoken audio clip from Ethiopia. 
 Identify which Ethiopian language is spoken (e.g., Amharic, Afaan Oromoo, Tigrinya, Somali, Sidama, Wolaytta, Gurage, Afar, Hadiyya, Gamo).

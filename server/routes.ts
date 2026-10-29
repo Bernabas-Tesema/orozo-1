@@ -316,6 +316,9 @@ router.patch('/availability', (req: Request, res: Response) => {
 // ==========================================
 router.get('/requests', (req: Request, res: Response) => {
   const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
   const { status, urgency, category } = req.query;
 
   let list = db.requests;
@@ -500,6 +503,9 @@ router.post('/requests/:reference/cancel', (req: Request, res: Response) => {
 // ==========================================
 router.get('/assignments', (req: Request, res: Response) => {
   const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
   const interpProfile = db.interpreters.find(i => i.userId === currentUser.id);
 
   let list = db.assignments;
@@ -1097,6 +1103,9 @@ router.patch('/platform-settings', (req: Request, res: Response) => {
 // ==========================================
 router.get('/notifications', (req: Request, res: Response) => {
   const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
   const list = db.notifications.filter(n => n.recipientId === currentUser.id);
   res.json({ notifications: list });
 });
