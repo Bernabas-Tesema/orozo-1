@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Building2, Headphones, Activity, Monitor, Lock, UserRound, ShieldCheck } from 'lucide-react';
+import { Building2, Headphones, Activity, Monitor, Lock, UserRound, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface LoginPageProps {
   users: User[];
@@ -43,37 +43,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
   const platformAdmins = users.filter((u) => u.role === 'platform_admin');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#3b82f6] via-[#2f6fe0] to-[#1d4ed8] flex items-center justify-center p-4 sm:p-8">
-      <div className="w-full max-w-4xl bg-white rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-2 min-h-[520px]">
-        <section className="relative bg-[#2f6fe8] text-white px-8 pt-8 pb-10 overflow-hidden flex flex-col">
-          <div className="absolute -left-16 -bottom-20 w-56 h-56 rounded-full bg-[#5b93f5]" />
-          <div className="absolute left-24 -bottom-24 w-48 h-48 rounded-full bg-[#4b86f3]" />
-          <div className="absolute -right-10 top-1/2 w-36 h-36 rounded-full bg-[#6aa0f8]/80" />
+    <div className="min-h-screen bg-[#eef4fb] flex items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-5xl bg-white rounded-[30px] shadow-[0_24px_70px_rgba(20,54,93,0.18)] overflow-hidden grid lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative min-h-[360px] lg:min-h-[620px] bg-gradient-to-br from-[#123c68] via-[#155b86] to-[#168b91] text-white px-7 py-8 sm:px-12 sm:py-10 overflow-hidden flex flex-col">
+          <div className="absolute -left-20 -bottom-24 w-72 h-72 rounded-full bg-[#35b6ae]/30" />
+          <div className="absolute right-[-80px] top-[-60px] w-64 h-64 rounded-full border-[34px] border-white/10" />
+          <div className="absolute right-10 bottom-16 w-28 h-28 rounded-full bg-[#f7c873]/20 blur-sm" />
           <div className="relative z-10 flex flex-col flex-1">
-            <img src="/orzo-logo.png" alt="ORZO" className="w-14 h-14 rounded-full ring-2 ring-white/50" />
+            <div className="flex items-center gap-3">
+              <img src="/orzo-logo.png" alt="ORZO" className="w-14 h-14 rounded-2xl ring-2 ring-white/40 shadow-lg" />
+              <div>
+                <p className="text-lg font-black tracking-[0.24em]">ORZO</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">Language access platform</p>
+              </div>
+            </div>
             <img
               src="/welcome-illustration.png"
               alt=""
-              className="mt-5 w-40 h-auto self-start"
+              className="mt-8 w-40 h-auto self-start opacity-95"
             />
-            <div className="max-w-xs pt-8">
-            <h1 className="text-4xl font-black tracking-[0.18em]">WELCOME</h1>
-            <p className="mt-3 text-sm font-semibold tracking-[0.22em] text-white/90">ORZO STAFF PORTAL</p>
-            <p className="mt-5 text-sm text-blue-50/90 leading-relaxed">
-              Sign in to request interpreters for hospitals, courts, immigration desks, and public service.
-            </p>
+            <div className="max-w-md pt-7">
+              <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#a6eee4]">ORZO staff portal</p>
+              <h1 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight">Language access, coordinated with care.</h1>
+              <p className="mt-4 text-sm sm:text-base text-white/80 leading-relaxed">
+                Connect hospitals, courts, immigration desks, and public services with trusted interpreters across Ethiopia.
+              </p>
+              <div className="mt-7 grid gap-3 text-xs font-medium text-white/85">
+                {['Human-led interpreter coordination', 'Secure, role-based workspaces', 'Support for Ethiopia’s languages'].map((item) => (
+                  <span key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-[#a6eee4]" />
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="relative px-8 sm:px-10 py-10">
-          <div className="absolute -right-8 bottom-10 w-24 h-24 rounded-full bg-[#dbe7ff]" />
-          <form onSubmit={handleSubmit} className="relative z-10">
-            <h2 className="text-3xl font-bold text-slate-900">Sign in</h2>
-            <p className="mt-1 text-sm text-slate-400">Use your staff account to open the portal.</p>
+        <section className="relative px-7 sm:px-12 py-9 sm:py-12 flex items-center">
+          <div className="absolute right-[-45px] bottom-[-50px] w-36 h-36 rounded-full bg-[#dff4f2]" />
+          <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-md mx-auto">
+            <div className="flex items-center gap-2 text-[#168b91] text-xs font-bold uppercase tracking-[0.16em]">
+              <ShieldCheck className="w-4 h-4" />
+              Secure staff access
+            </div>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#123c68]">Welcome back</h2>
+            <p className="mt-2 text-sm text-slate-500">Sign in to open your ORZO workspace.</p>
 
-            <label className="mt-8 flex items-center gap-3 border border-slate-200 rounded-lg px-3 py-2.5">
-              <UserRound className="w-4 h-4 text-slate-400" />
+            <label className="mt-8 flex items-center gap-3 border border-slate-200 bg-slate-50/70 rounded-xl px-4 py-3.5 transition focus-within:border-[#168b91] focus-within:ring-4 focus-within:ring-[#168b91]/10">
+              <UserRound className="w-4 h-4 text-[#168b91]" />
               <input
                 type="email"
                 required
@@ -82,25 +100,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
                   setEmail(e.target.value);
                   setSelectedUserId('');
                 }}
-                placeholder="User Name"
-                className="w-full text-sm outline-none bg-transparent"
+                placeholder="Work email"
+                className="w-full text-sm outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
               />
             </label>
 
-            <label className="mt-4 flex items-center gap-3 border border-slate-200 rounded-lg px-3 py-2.5">
-              <Lock className="w-4 h-4 text-slate-400" />
+            <label className="mt-4 flex items-center gap-3 border border-slate-200 bg-slate-50/70 rounded-xl px-4 py-3.5 transition focus-within:border-[#168b91] focus-within:ring-4 focus-within:ring-[#168b91]/10">
+              <Lock className="w-4 h-4 text-[#168b91]" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full text-sm outline-none bg-transparent"
+                className="w-full text-sm outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((open) => !open)}
-                className="text-[11px] font-bold tracking-wide text-slate-500 cursor-pointer"
+                className="text-[11px] font-bold tracking-wide text-[#168b91] cursor-pointer"
               >
                 {showPassword ? 'HIDE' : 'SHOW'}
               </button>
@@ -114,7 +132,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
               <button
                 type="button"
                 onClick={() => setNotice('Passwords are issued by your organization desk.')}
-                className="cursor-pointer hover:text-slate-800"
+                className="cursor-pointer text-[#168b91] hover:text-[#123c68] font-semibold"
               >
                 Forgot Password?
               </button>
@@ -123,23 +141,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
             <button
               type="submit"
               disabled={isSubmitting || users.length === 0}
-              className="mt-6 w-full bg-[#163a63] hover:bg-[#102c4c] disabled:opacity-60 text-white font-semibold py-3 rounded-lg cursor-pointer"
+              className="mt-7 w-full bg-[#123c68] hover:bg-[#0d2f51] disabled:opacity-60 text-white font-bold py-3.5 rounded-xl cursor-pointer shadow-lg shadow-[#123c68]/20 transition-all flex items-center justify-center gap-2"
             >
               {isSubmitting ? 'Signing in...' : 'Sign in'}
+              {!isSubmitting && <ArrowRight className="w-4 h-4" />}
             </button>
 
             <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
-              or
+              staff roles
               <span className="h-px flex-1 bg-slate-200" />
             </div>
 
             <button
               type="button"
               onClick={() => setShowOther((open) => !open)}
-              className="w-full border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg cursor-pointer hover:bg-slate-50"
+              className="w-full border border-[#b8d9dc] text-[#155b86] font-bold py-3 rounded-xl cursor-pointer hover:bg-[#effafa] transition-colors"
             >
-              Sign in with other
+              Choose another staff role
             </button>
 
             {showOther && (
@@ -199,7 +218,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
               <button
                 type="button"
                 onClick={() => setNotice('New accounts are opened by a platform administrator.')}
-                className="text-slate-700 font-semibold cursor-pointer"
+                className="text-[#168b91] font-semibold cursor-pointer"
               >
                 Sign Up
               </button>
@@ -229,10 +248,10 @@ function RoleButton({
       type="button"
       onClick={onClick}
       className={`text-left p-2.5 rounded-lg border text-xs cursor-pointer ${
-        active ? 'border-[#2f6fe8] bg-blue-50' : 'border-slate-200 hover:bg-slate-50'
+        active ? 'border-[#168b91] bg-[#effafa] ring-2 ring-[#168b91]/10' : 'border-slate-200 hover:bg-slate-50'
       }`}
     >
-      <span className="flex items-center gap-1.5 font-bold text-slate-800">
+      <span className="flex items-center gap-1.5 font-bold text-[#123c68]">
         {icon}
         {label}
       </span>
