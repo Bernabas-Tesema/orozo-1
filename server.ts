@@ -46,8 +46,20 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Ethiopian Interpretation Platform running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(
+        `Port ${PORT} is already in use. Stop the process using it or run with another port, for example:`,
+      );
+      console.error('$env:PORT=3001; npm run dev');
+    } else {
+      console.error('Failed to start the HTTP server:', error);
+    }
+    process.exit(1);
   });
 }
 

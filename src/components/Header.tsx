@@ -1,7 +1,6 @@
 import React from 'react';
 import { User, PlatformNotification } from '../types';
 import {
-  Languages,
   Bell,
   ShieldCheck,
   UserCheck,
@@ -9,10 +8,8 @@ import {
   Building2,
   Activity,
   PhoneCall,
-  Bot,
   LogOut,
-  Monitor,
-  Smartphone
+  Monitor
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -25,10 +22,7 @@ interface HeaderProps {
   onChangeLocale: (locale: string) => void;
   activeSessionId?: string;
   onJoinActiveSession?: (sessionId: string) => void;
-  onOpenOrzoSupport?: () => void;
   onLogout?: () => void;
-  orgViewMode?: 'web' | 'android';
-  onToggleOrgViewMode?: (mode: 'web' | 'android') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,10 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onChangeLocale,
   activeSessionId,
   onJoinActiveSession,
-  onOpenOrzoSupport,
   onLogout,
-  orgViewMode,
-  onToggleOrgViewMode,
 }) => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -125,9 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-16">
           {/* Logo & Platform Name */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              <Languages className="w-6 h-6 text-white" />
-            </div>
+            <img src="/orzo-logo.png" alt="ORZO" className="w-12 h-12 rounded-full" />
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-black text-gray-900 text-base sm:text-lg tracking-tight">
@@ -137,44 +126,10 @@ export const Header: React.FC<HeaderProps> = ({
                   Translation & Interpretation
                 </span>
               </div>
-              <p className="text-xs text-gray-500 font-medium">
-                የኢትዮጵያ ቋንቋዎች አስተርጓሚ መድረክ
-              </p>
             </div>
           </div>
 
-          {/* Right Controls: Organization View Switcher, ORZO Support, Notifications, Profile, Logout */}
           <div className="flex items-center space-x-2 sm:space-x-3">
-            {/* If Client/Organization: Separate Website vs Android App toggle */}
-            {currentUser.role === 'client' && onToggleOrgViewMode && (
-              <div className="hidden sm:inline-flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-xs">
-                <button
-                  onClick={() => onToggleOrgViewMode('web')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center space-x-1 cursor-pointer ${
-                    orgViewMode === 'web'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  title="Organization Web Portal"
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                  <span>Web Portal</span>
-                </button>
-                <button
-                  onClick={() => onToggleOrgViewMode('android')}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center space-x-1 cursor-pointer ${
-                    orgViewMode === 'android'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  title="Organization Android App"
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>Android App</span>
-                </button>
-              </div>
-            )}
-
             {/* Language Locale Preview */}
             <select
               value={currentLocale}
@@ -187,18 +142,6 @@ export const Header: React.FC<HeaderProps> = ({
               <option value="ti">ትግርኛ (Tigrinya)</option>
               <option value="so">Af-Soomaali</option>
             </select>
-
-            {/* ORZO Support & Audio Identifier Button */}
-            {onOpenOrzoSupport && (
-              <button
-                onClick={onOpenOrzoSupport}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
-                title="ORZO Customer Support & Audio Dialect Identifier"
-              >
-                <Bot className="w-4 h-4 text-blue-600" />
-                <span className="hidden sm:inline">ORZO Support</span>
-              </button>
-            )}
 
             {/* Notifications Button */}
             <button

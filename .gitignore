@@ -7,3 +7,11 @@ coverage/
 .env*
 !.env.example
 .aistudio/
+__pycache__/
+*.pyc
+orozo/backend/db.sqlite3
+orozo/backend/.venv/
+orozo/app/.dart_tool/
+orozo/app/build/
+orozo/app/.flutter-plugins
+orozo/app/.flutter-plugins-dependencies

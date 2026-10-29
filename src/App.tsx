@@ -33,7 +33,6 @@ import { LiveSessionRoom } from './components/LiveSessionRoom';
 import { CompletionReportModal } from './components/CompletionReportModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { OperationalReports } from './components/OperationalReports';
-import { AndroidClientApp } from './components/AndroidClientApp';
 import { OrzoSupportModal } from './components/OrzoSupportModal';
 import { LoginPage } from './components/LoginPage';
 import {
@@ -42,8 +41,6 @@ import {
   AlertCircle,
   RefreshCw,
   Info,
-  Smartphone,
-  Monitor,
   Bot,
   Mic
 } from 'lucide-react';
@@ -72,25 +69,25 @@ export default function App() {
   const [completionModalSessionId, setCompletionModalSessionId] = useState<string | null>(null);
   const [feedbackModalSessionId, setFeedbackModalSessionId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'main' | 'reports'>('main');
-  const [platformMode, setPlatformMode] = useState<'web' | 'android'>('web');
   const [isOrzoSupportOpen, setIsOrzoSupportOpen] = useState(false);
   const [preselectedSourceLanguage, setPreselectedSourceLanguage] = useState<string | null>(null);
 
   // Initial Data Fetch
   const refreshData = useCallback(async () => {
     try {
-      const [
-        meRes,
-        usersRes,
-        langsRes,
-        interpsRes,
-        reqsRes,
-        asgRes,
-        notifsRes,
-        settingsRes,
-      ] = await Promise.all([
-        api.getMe(),
-        api.getUsers(),
+      const [meRes, usersRes] = await Promise.all([api.getMe(), api.getUsers()]);
+      setAllUsers(usersRes.users);
+      setError(null);
+
+      const signedIn = sessionStorage.getItem('orzo-web-session') === '1' && !!meRes.user;
+      if (!signedIn) {
+        if (!meRes.user) sessionStorage.removeItem('orzo-web-session');
+        setCurrentUser(null);
+        setInterpreterProfile(null);
+        return;
+      }
+
+      const [langsRes, interpsRes, reqsRes, asgRes, notifsRes, settingsRes] = await Promise.all([
         api.getLanguages(),
         api.getInterpreters(),
         api.getRequests(),
@@ -101,7 +98,6 @@ export default function App() {
 
       setCurrentUser(meRes.user);
       setInterpreterProfile(meRes.interpreterProfile);
-      setAllUsers(usersRes.users);
       setLanguages(langsRes.languages);
       setInterpreters(interpsRes.interpreters);
       setRequests(reqsRes.requests);
@@ -109,7 +105,6 @@ export default function App() {
       setNotifications(notifsRes.notifications);
       setSettings(settingsRes.settings);
 
-      // If supervisor or admin, fetch queue & audits
       if (meRes.user?.role === 'supervisor' || meRes.user?.role === 'platform_admin') {
         const queueRes = await api.getSupervisorQueue().catch(() => null);
         if (queueRes) {
@@ -158,6 +153,7 @@ export default function App() {
 
   const handleLogin = async (user: User) => {
     try {
+      sessionStorage.setItem('orzo-web-session', '1');
       setLoading(true);
       const res = await api.login({ userId: user.id });
       setCurrentUser(res.user);
@@ -165,6 +161,7 @@ export default function App() {
       setCurrentView('main');
       await refreshData();
     } catch (err: any) {
+      sessionStorage.removeItem('orzo-web-session');
       alert(`Login failed: ${err.message}`);
     } finally {
       setLoading(false);
@@ -172,6 +169,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('orzo-web-session');
     try {
       await api.logout();
       setCurrentUser(null);
@@ -331,15 +329,13 @@ export default function App() {
       }
     : null;
 
-  if (loading && !currentUser) {
+  if (loading && !currentUser && sessionStorage.getItem('orzo-web-session') === '1') {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-4">
-        <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-bold text-2xl mb-4 border border-blue-400 animate-pulse">
-          የ
-        </div>
+      <div className="min-h-screen bg-[#0E2A3A] flex flex-col items-center justify-center text-white p-4">
+        <img src="/orzo-logo.png" alt="ORZO" className="w-24 h-24 rounded-full mb-4" />
         <h2 className="text-lg font-bold">ORZO Translation & Interpretation</h2>
-        <p className="text-xs text-slate-400 mt-1">Connecting to secure dispatch platform...</p>
-        <RefreshCw className="w-5 h-5 text-blue-400 animate-spin mt-4" />
+        <p className="text-xs text-slate-300 mt-1">Connecting to secure dispatch platform...</p>
+        <RefreshCw className="w-5 h-5 text-teal-300 animate-spin mt-4" />
       </div>
     );
   }
@@ -388,10 +384,7 @@ export default function App() {
         onChangeLocale={setLocale}
         activeSessionId={activeSessionForUser}
         onJoinActiveSession={(sessionId) => setActiveSessionRoomId(sessionId)}
-        onOpenOrzoSupport={() => setIsOrzoSupportOpen(true)}
         onLogout={handleLogout}
-        orgViewMode={platformMode}
-        onToggleOrgViewMode={(m) => setPlatformMode(m)}
       />
 
       {/* Privileged Role Navigation Bar (Supervisor & Admin) */}
@@ -431,18 +424,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {currentUser.role === 'client' && platformMode === 'android' ? (
-          <AndroidClientApp
-            currentUser={currentUser}
-            requests={requests}
-            languages={languages}
-            onCreateRequest={handleCreateRequest}
-            onJoinSession={(sessionId) => setActiveSessionRoomId(sessionId)}
-            onOpenFeedback={(sessionId) => setFeedbackModalSessionId(sessionId)}
-            onOpenOrzoSupport={() => setIsOrzoSupportOpen(true)}
-            initialSourceLanguage={preselectedSourceLanguage}
-          />
-        ) : currentView === 'reports' ? (
+        {currentView === 'reports' ? (
           <OperationalReports />
         ) : (
           <>
@@ -455,6 +437,7 @@ export default function App() {
                 onCancelRequest={handleCancelRequest}
                 onJoinSession={(sessionId) => setActiveSessionRoomId(sessionId)}
                 onOpenFeedback={(sessionId) => setFeedbackModalSessionId(sessionId)}
+                initialSourceLanguage={preselectedSourceLanguage}
               />
             )}
 
@@ -591,7 +574,6 @@ export default function App() {
         onClose={() => setIsOrzoSupportOpen(false)}
         onSelectLanguageForRequest={(langCode) => {
           setPreselectedSourceLanguage(langCode);
-          setPlatformMode('web');
         }}
       />
     </div>

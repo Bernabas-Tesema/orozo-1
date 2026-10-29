@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User,
   InterpretationRequest,
@@ -45,6 +45,7 @@ interface ClientPortalProps {
   onCancelRequest: (reference: string, reason?: string) => Promise<void>;
   onJoinSession: (sessionId: string) => void;
   onOpenFeedback: (sessionId: string) => void;
+  initialSourceLanguage?: string | null;
 }
 
 export const ClientPortal: React.FC<ClientPortalProps> = ({
@@ -55,6 +56,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   onCancelRequest,
   onJoinSession,
   onOpenFeedback,
+  initialSourceLanguage,
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,6 +79,13 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [cancelReason, setCancelReason] = useState('');
 
   const isOrgAdmin = currentUser.clientAccountType === 'organization_admin';
+
+  useEffect(() => {
+    if (!initialSourceLanguage) return;
+    setSourceLanguage(initialSourceLanguage);
+    setIsUnknownLanguage(false);
+    setShowModal(true);
+  }, [initialSourceLanguage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +186,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         <div>
           <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-blue-900/60 text-blue-300 text-xs font-semibold mb-2 border border-blue-700/50">
             {isOrgAdmin ? <Building2 className="w-3.5 h-3.5 mr-1" /> : <Monitor className="w-3.5 h-3.5 mr-1" />}
-            <span>{isOrgAdmin ? 'Organization Admin Portal' : 'Shared Staff Terminal'} • {currentUser.organizationName}</span>
+            <span>{currentUser.organizationName}</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight">
             Interpretation Intake & Dispatch
@@ -437,6 +446,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   <option value="immigration">Immigration & Refugee Center</option>
                   <option value="public_services">Public & Civil Administration</option>
                   <option value="ngo_humanitarian">NGO Humanitarian Operations</option>
+                  <option value="education">Education & Enrollment</option>
+                  <option value="business">Business & Commercial Meetings</option>
                 </select>
               </div>
 

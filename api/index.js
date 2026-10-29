@@ -1041,7 +1041,7 @@ function handleAssignmentResponse(assignmentId, interpreterId, response, reason)
 }
 
 // server/orzoSupportService.ts
-var HASAB_API_KEY = process.env.HASAB_API_KEY || "HASAB_KEY_sWpgYcotkhJb91PIKi8JZgdIRHtOaT";
+var HASAB_API_KEY = process.env.HASAB_API_KEY;
 var HASAB_ENDPOINT = "https://api.hasab.ai/api/v1/chat";
 var ELIP_PLATFORM_KNOWLEDGE = `
 You are ORZO Support (\u12E8\u12A6\u122D\u12DE \u12E8\u12F0\u1295\u1260\u129E\u127D \u12F5\u130B\u134D), the official intelligent customer support and linguistic assistant for the Ethiopian Language Interpretation Platform (ELIP).
@@ -1087,6 +1087,9 @@ ORZO Support Response:`;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 9e3);
+    if (!HASAB_API_KEY) {
+      throw new Error("HASAB_API_KEY is not configured");
+    }
     const hasabRes = await fetch(HASAB_ENDPOINT, {
       method: "POST",
       headers: {

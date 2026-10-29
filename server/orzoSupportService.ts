@@ -1,4 +1,4 @@
-const HASAB_API_KEY = process.env.HASAB_API_KEY || 'HASAB_KEY_sWpgYcotkhJb91PIKi8JZgdIRHtOaT';
+const HASAB_API_KEY = process.env.HASAB_API_KEY;
 const HASAB_ENDPOINT = 'https://api.hasab.ai/api/v1/chat';
 
 const ELIP_PLATFORM_KNOWLEDGE = `
@@ -62,6 +62,10 @@ export async function askOrzoSupport(userMessage: string, chatHistory: ChatMessa
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 9000);
+
+    if (!HASAB_API_KEY) {
+      throw new Error('HASAB_API_KEY is not configured');
+    }
 
     const hasabRes = await fetch(HASAB_ENDPOINT, {
       method: 'POST',

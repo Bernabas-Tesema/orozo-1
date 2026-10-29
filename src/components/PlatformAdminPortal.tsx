@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User,
   SupportedLanguage,
@@ -7,6 +7,7 @@ import {
   PlatformSettings
 } from '../types';
 import {
+  Building2,
   ShieldCheck,
   Languages,
   Sliders,
@@ -47,7 +48,21 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   onVerifyInterpreter,
   onUpdateSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'languages' | 'verification' | 'settings' | 'audit'>('languages');
+  const [activeTab, setActiveTab] = useState<'languages' | 'verification' | 'settings' | 'audit' | 'organizations'>('languages');
+  const [orgName, setOrgName] = useState('');
+  const [orgEmail, setOrgEmail] = useState('');
+  const [orgPassword, setOrgPassword] = useState('');
+  const [orgContact, setOrgContact] = useState('');
+  const [orgMessage, setOrgMessage] = useState<string | null>(null);
+  const [orgError, setOrgError] = useState<string | null>(null);
+  const [orgBusy, setOrgBusy] = useState(false);
+  const [registeredOrgs, setRegisteredOrgs] = useState<Array<{ id: string; organizationName: string; email: string; fullName: string }>>([]);
+  const [intName, setIntName] = useState('');
+  const [intEmail, setIntEmail] = useState('');
+  const [intPhone, setIntPhone] = useState('');
+  const [intLanguages, setIntLanguages] = useState('amh, eng');
+  const [intCategories, setIntCategories] = useState('healthcare');
+  const [storedInterpreters, setStoredInterpreters] = useState<Array<{ id: string; fullName: string; email: string; languages: string[]; categories: string[] }>>([]);
   const [searchAudit, setSearchAudit] = useState('');
 
   // Add Language modal
@@ -71,6 +86,94 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   // Interpreter verification note modal
   const [verifyModalInt, setVerifyModalInt] = useState<{ id: string; targetState: string } | null>(null);
   const [verifyNote, setVerifyNote] = useState('');
+
+  const djangoHeaders = {
+    'Content-Type': 'application/json',
+    'X-Account-Id': currentUser.id,
+  };
+
+  const loadRegistry = async () => {
+    const [orgRes, intRes] = await Promise.all([
+      fetch('/django-api/api/v1/organizations', { headers: djangoHeaders }),
+      fetch('/django-api/api/v1/interpreters', { headers: djangoHeaders }),
+    ]);
+    if (!orgRes.ok || !intRes.ok) {
+      const failed = !orgRes.ok ? orgRes : intRes;
+      const body = await failed.json().catch(() => ({}));
+      throw new Error(body.error || 'Could not load the Django registry.');
+    }
+    const orgData = await orgRes.json();
+    const intData = await intRes.json();
+    setRegisteredOrgs(orgData.organizations || []);
+    setStoredInterpreters(intData.interpreters || []);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'organizations') return;
+    loadRegistry().catch((err: Error) => setOrgError(err.message));
+  }, [activeTab]);
+
+  const registerOrganization = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setOrgBusy(true);
+    setOrgError(null);
+    setOrgMessage(null);
+    try {
+      const response = await fetch('/django-api/api/v1/organizations', {
+        method: 'POST',
+        headers: djangoHeaders,
+        body: JSON.stringify({
+          organizationName: orgName,
+          email: orgEmail,
+          password: orgPassword,
+          contactName: orgContact,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Registration failed.');
+      setOrgMessage(body.message || 'Credentials were sent.');
+      setOrgName('');
+      setOrgEmail('');
+      setOrgPassword('');
+      setOrgContact('');
+      await loadRegistry();
+    } catch (err: any) {
+      setOrgError(err.message);
+    } finally {
+      setOrgBusy(false);
+    }
+  };
+
+  const saveInterpreter = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setOrgBusy(true);
+    setOrgError(null);
+    setOrgMessage(null);
+    try {
+      const response = await fetch('/django-api/api/v1/interpreters', {
+        method: 'POST',
+        headers: djangoHeaders,
+        body: JSON.stringify({
+          fullName: intName,
+          email: intEmail,
+          phone: intPhone,
+          languages: intLanguages.split(',').map((item) => item.trim()).filter(Boolean),
+          categories: intCategories.split(',').map((item) => item.trim()).filter(Boolean),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Could not store the interpreter.');
+      setOrgMessage(`${body.interpreter.fullName} is stored in the database.`);
+      setIntName('');
+      setIntEmail('');
+      setIntPhone('');
+      await loadRegistry();
+    } catch (err: any) {
+      setOrgError(err.message);
+    } finally {
+      setOrgBusy(false);
+    }
+  };
 
   const handleToggleLang = async (code: string, currentActive: boolean) => {
     try {
@@ -168,6 +271,18 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
         {/* Tab switcher */}
         <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-slate-800">
           <button
+            onClick={() => setActiveTab('organizations')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+              activeTab === 'organizations'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Organizations</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('languages')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
               activeTab === 'languages'
@@ -216,6 +331,49 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
           </button>
         </div>
       </div>
+
+      {activeTab === 'organizations' && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <form onSubmit={registerOrganization} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-3">
+            <h3 className="text-sm font-bold text-gray-900">Register an organization</h3>
+            <p className="text-xs text-gray-500">The organization name and password are saved, and the login credentials are emailed to the address below.</p>
+            <input value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder="Organization name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={orgContact} onChange={(e) => setOrgContact(e.target.value)} placeholder="Admin contact name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={orgEmail} onChange={(e) => setOrgEmail(e.target.value)} required type="email" placeholder="Email for the credentials" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={orgPassword} onChange={(e) => setOrgPassword(e.target.value)} required type="password" minLength={6} placeholder="Password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <button disabled={orgBusy} className="bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
+              {orgBusy ? 'Saving...' : 'Register and send credentials'}
+            </button>
+            <ul className="text-xs text-gray-600 space-y-1 pt-2">
+              {registeredOrgs.map((org) => (
+                <li key={org.id}>{org.organizationName} — {org.email}</li>
+              ))}
+            </ul>
+          </form>
+
+          <form onSubmit={saveInterpreter} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-3">
+            <h3 className="text-sm font-bold text-gray-900">Store an interpreter</h3>
+            <p className="text-xs text-gray-500">Interpreter records are written to the Django database and used when a request is matched.</p>
+            <input value={intName} onChange={(e) => setIntName(e.target.value)} required placeholder="Full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={intEmail} onChange={(e) => setIntEmail(e.target.value)} required type="email" placeholder="Email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={intPhone} onChange={(e) => setIntPhone(e.target.value)} placeholder="Phone" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={intLanguages} onChange={(e) => setIntLanguages(e.target.value)} placeholder="Languages, comma separated (amh, eng)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={intCategories} onChange={(e) => setIntCategories(e.target.value)} placeholder="Categories, comma separated (healthcare)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <button disabled={orgBusy} className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
+              Save interpreter
+            </button>
+            <ul className="text-xs text-gray-600 space-y-1 pt-2 max-h-40 overflow-auto">
+              {storedInterpreters.map((person) => (
+                <li key={person.id}>{person.fullName} — {person.email}</li>
+              ))}
+            </ul>
+          </form>
+
+          {(orgMessage || orgError) && (
+            <p className={`lg:col-span-2 text-sm ${orgError ? 'text-red-700' : 'text-emerald-700'}`}>{orgError || orgMessage}</p>
+          )}
+        </div>
+      )}
 
       {/* TAB 1: SUPPORTED LANGUAGES CATALOG (FR-014, FR-019) */}
       {activeTab === 'languages' && (

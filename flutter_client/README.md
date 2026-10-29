@@ -1,4 +1,7 @@
 # Ethiopian Language Interpretation Platform (ELIP)
+
+The field client now lives in [`orozo/app`](../orozo/app). This folder is the earlier draft. Use `orozo/app` with the Django API in `orozo/backend`.
+
 ## Flutter Android Client for Organizations (Hospitals, Courts, Public Agencies)
 
 Compliant with **SRS v1.0 Section 4.2** and **AI Development Prompt Pack (Prompt 5)**.
