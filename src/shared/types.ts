@@ -195,6 +195,7 @@ export interface CompletionReport {
 export interface PlatformNotification {
   id: string;
   recipientId: string;
+  recipientRole: UserRole;
   title: string;
   message: string;
   channel: 'in_app' | 'sms' | 'email' | 'push';

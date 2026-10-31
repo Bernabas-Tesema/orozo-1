@@ -12,8 +12,25 @@ import {
 } from './types';
 import { dispatchRequest, handleAssignmentResponse, findEligibleInterpreters } from './matchingEngine';
 import { askOrzoSupport, identifyAudioLanguage } from './orzoSupportService';
+import { sendCredentialEmail } from './mail';
 
 const router = Router();
+
+function organizationKey(name: string) {
+  return name.toLowerCase().replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function sameOrganization(left: string, right: string) {
+  return organizationKey(left) === organizationKey(right);
+}
+
+function minutesForRequest(reference: string) {
+  const completion = db.completions.find((item) => item.requestReference === reference);
+  if (completion) return completion.durationMinutes;
+  const session = db.sessions.find((item) => item.requestReference === reference);
+  if (session?.durationSeconds) return Math.round(session.durationSeconds / 60);
+  return 0;
+}
 
 // Middleware: inject current mock/session authenticated user
 router.use((req: Request, _res: Response, next) => {
@@ -39,7 +56,7 @@ router.get('/users', (_req: Request, res: Response) => {
 });
 
 router.post('/auth/login', (req: Request, res: Response) => {
-  const { email, userId } = req.body;
+  const { email, userId, password } = req.body;
   let targetUser = null;
   if (userId) {
     targetUser = db.users.find(u => u.id === userId);
@@ -49,6 +66,10 @@ router.post('/auth/login', (req: Request, res: Response) => {
 
   if (!targetUser) {
     return res.status(401).json({ error: 'Invalid credentials. User account not found.' });
+  }
+
+  if (db.hasPassword(targetUser.id) && !db.checkPassword(targetUser.id, String(password || ''))) {
+    return res.status(401).json({ error: 'Invalid credentials.' });
   }
 
   const user = db.setCurrentUser(targetUser.id);
@@ -204,6 +225,77 @@ router.get('/interpreters', (req: Request, res: Response) => {
   res.json({ interpreters: list });
 });
 
+router.post('/interpreters', async (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
+  if (currentUser.role !== 'platform_admin') {
+    return res.status(403).json({ error: 'Only platform administrators can add interpreters' });
+  }
+
+  const { fullName, email, password, phone, languages, categories } = req.body || {};
+  const languageCodes = Array.isArray(languages)
+    ? languages.map((item: string) => String(item).trim().toLowerCase()).filter(Boolean)
+    : String(languages || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const categoryList = (Array.isArray(categories) ? categories : String(categories || '').split(','))
+    .map((item: string) => String(item).trim().toLowerCase())
+    .filter(Boolean);
+  const allowed = ['healthcare', 'legal_court', 'immigration', 'public_services', 'ngo_humanitarian', 'education', 'business'];
+  const serviceCategories = categoryList.filter((item: string) => allowed.includes(item)) as ServiceCategory[];
+
+  if (!String(fullName || '').trim() || !String(email || '').trim()) {
+    return res.status(400).json({ error: 'Interpreter name and email are required.' });
+  }
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ error: 'The interpreter needs a password of at least 6 characters.' });
+  }
+  if (languageCodes.length === 0) {
+    return res.status(400).json({ error: 'Add at least one language code.' });
+  }
+  if (serviceCategories.length === 0) {
+    return res.status(400).json({ error: 'Add at least one service category.' });
+  }
+
+  let created: ReturnType<typeof db.createInterpreterAccount> | null = null;
+  try {
+    created = db.createInterpreterAccount({
+      fullName,
+      email,
+      password: String(password),
+      phone,
+      languages: languageCodes,
+      categories: serviceCategories,
+    });
+    await sendCredentialEmail({
+      to: created.user.email,
+      name: created.user.fullName,
+      roleLabel: 'interpreter',
+      organizationName: 'ORZO',
+      password: String(password),
+    });
+    db.logAudit({
+      actorId: currentUser.id,
+      actorName: currentUser.fullName,
+      actorRole: currentUser.role,
+      action: 'INTERPRETER_ACCOUNT_CREATED',
+      resourceType: 'interpreter_profile',
+      resourceId: created.profile.id,
+      result: 'success',
+      securityMetadata: { note: `Credentials emailed to ${created.user.email}` },
+    });
+    res.status(201).json({
+      interpreter: created.profile,
+      message: `Credentials were sent to ${created.user.email}.`,
+    });
+  } catch (err: unknown) {
+    if (created) db.removeAccounts([created.user.id]);
+    const message = err instanceof Error ? err.message : 'Could not create the interpreter.';
+    const status = message.includes('already exists') || message.includes('required') ? 400 : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
 router.get('/interpreters/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const profile = db.interpreters.find(i => i.id === id || i.userId === id);
@@ -325,7 +417,9 @@ router.get('/requests', (req: Request, res: Response) => {
 
   // Role scoping:
   // Clients see their own requests (or requests belonging to their organization)
-  if (currentUser.role === 'client') {
+  if (currentUser.role === 'client' && currentUser.clientAccountType === 'organization_admin') {
+    list = list.filter((item) => sameOrganization(item.organizationName, currentUser.organizationName));
+  } else if (currentUser.role === 'client') {
     list = list.filter(r => r.requesterId === currentUser.id);
   } else if (currentUser.role === 'interpreter') {
     const interpProfile = db.interpreters.find(i => i.userId === currentUser.id);
@@ -735,8 +829,7 @@ router.post('/completions', (req: Request, res: Response) => {
 
   // If flagged for review, notify supervisor
   if (newReport.reviewStatus === 'flagged_for_review') {
-    db.createNotification({
-      recipientId: 'usr-super-1',
+    db.notifyRole('supervisor', {
       title: 'Flagged Interpretation Session',
       message: `Session ${sessionId} flagged by ${interpreterName} with issue code: ${newReport.issueCode}.`,
       channel: 'in_app',
@@ -775,6 +868,17 @@ router.post('/feedback', (req: Request, res: Response) => {
     submittedAt: new Date().toISOString(),
   };
 
+  const interpreter = db.interpreters.find((item) => item.id === completion.interpreterId);
+  if (interpreter) {
+    const reviews = db.completions.filter(
+      (item) => item.interpreterId === interpreter.id && item.clientFeedback
+    );
+    const reviewAverage = reviews.reduce((sum, item) => sum + (item.clientFeedback?.rating || 0), 0) / reviews.length;
+    const earlierSessions = Math.max(interpreter.totalSessionsCompleted - reviews.length, 0);
+    const blended = ((4.8 * earlierSessions) + (reviewAverage * reviews.length)) / Math.max(earlierSessions + reviews.length, 1);
+    interpreter.rating = Number(blended.toFixed(2));
+  }
+
   db.logAudit({
     actorId: currentUser.id,
     actorName: currentUser.fullName,
@@ -792,6 +896,32 @@ router.post('/feedback', (req: Request, res: Response) => {
 // ==========================================
 // 8. SUPERVISOR / COORDINATOR WORKSPACE (/api/v1/supervisor/*)
 // ==========================================
+router.get('/supervisor/interpreter-ratings', (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser || (currentUser.role !== 'supervisor' && currentUser.role !== 'platform_admin')) {
+    return res.status(403).json({ error: 'Only a supervisor can see interpreter comments' });
+  }
+
+  const interpreters = [...db.interpreters]
+    .sort((a, b) => b.rating - a.rating || b.totalSessionsCompleted - a.totalSessionsCompleted)
+    .map((interpreter) => ({
+      id: interpreter.id,
+      fullName: interpreter.fullName,
+      rating: interpreter.rating,
+      totalSessionsCompleted: interpreter.totalSessionsCompleted,
+      comments: db.completions
+        .filter((item) => item.interpreterId === interpreter.id && item.clientFeedback)
+        .map((item) => ({
+          rating: item.clientFeedback?.rating || 0,
+          comment: item.clientFeedback?.comment || '',
+          submittedAt: item.clientFeedback?.submittedAt || item.createdAt,
+          requestReference: item.requestReference,
+        })),
+    }));
+
+  res.json({ interpreters });
+});
+
 router.get('/supervisor/queue', (req: Request, res: Response) => {
   const currentUser = (req as any).user;
   if (currentUser.role !== 'supervisor' && currentUser.role !== 'platform_admin') {
@@ -881,8 +1011,7 @@ router.post('/supervisor/assign', (req: Request, res: Response) => {
   }
   reqItem.activeSessionId = session.id;
 
-  db.createNotification({
-    recipientId: interp.userId,
+  db.notifyUser(interp.userId, {
     title: 'Coordinator Direct Assignment',
     message: `Supervisor ${currentUser.fullName} manually assigned ${reqItem.reference} to you. Reason: ${reason || 'Direct operational dispatch'}`,
     channel: 'in_app',
@@ -977,6 +1106,185 @@ router.post('/supervisor/resolve-issue', (req: Request, res: Response) => {
 // ==========================================
 // 9. OPERATIONAL REPORTS & AUDIT LOGS (/api/v1/reports & /api/v1/audit-logs)
 // ==========================================
+router.get('/organizations', (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
+  if (currentUser.role !== 'platform_admin') {
+    return res.status(403).json({ error: 'Only platform administrators can list organizations' });
+  }
+
+  const groups = new Map<string, { organizationName: string; accounts: Array<{ id: string; fullName: string; email: string; clientAccountType?: string }> }>();
+  for (const user of db.users) {
+    if (user.role !== 'client' || !user.clientAccountType) continue;
+    const key = organizationKey(user.organizationName);
+    const group = groups.get(key) || { organizationName: user.organizationName, accounts: [] };
+    group.accounts.push({
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      clientAccountType: user.clientAccountType,
+    });
+    groups.set(key, group);
+  }
+
+  res.json({ organizations: [...groups.values()] });
+});
+
+router.post('/organizations', async (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
+  if (currentUser.role !== 'platform_admin') {
+    return res.status(403).json({ error: 'Only platform administrators can create organization accounts' });
+  }
+
+  const {
+    organizationName,
+    adminName,
+    adminEmail,
+    adminPassword,
+    deskName,
+    deskEmail,
+    deskPassword,
+    phone,
+  } = req.body || {};
+
+  if (!organizationName?.trim() || !adminName?.trim() || !adminEmail?.trim() || !deskEmail?.trim()) {
+    return res.status(400).json({ error: 'Organization name and both account emails are required.' });
+  }
+  if (!adminPassword || String(adminPassword).length < 6 || !deskPassword || String(deskPassword).length < 6) {
+    return res.status(400).json({ error: 'Each account needs a password of at least 6 characters.' });
+  }
+
+  let created: ReturnType<typeof db.createOrganizationAccounts> | null = null;
+  try {
+    created = db.createOrganizationAccounts({
+      organizationName,
+      adminName,
+      adminEmail,
+      adminPassword: String(adminPassword),
+      deskName: deskName?.trim() || `${String(organizationName).trim()} triage desk`,
+      deskEmail,
+      deskPassword: String(deskPassword),
+      phone,
+    });
+    await sendCredentialEmail({
+      to: created.admin.email,
+      name: created.admin.fullName,
+      roleLabel: 'organization admin',
+      organizationName: created.admin.organizationName,
+      password: String(adminPassword),
+    });
+    await sendCredentialEmail({
+      to: created.desk.email,
+      name: created.desk.fullName,
+      roleLabel: 'triage desk',
+      organizationName: created.desk.organizationName,
+      password: String(deskPassword),
+    });
+    db.logAudit({
+      actorId: currentUser.id,
+      actorName: currentUser.fullName,
+      actorRole: currentUser.role,
+      action: 'ORGANIZATION_ACCOUNTS_CREATED',
+      resourceType: 'organization',
+      resourceId: created.admin.organizationName,
+      result: 'success',
+      securityMetadata: { note: `Credentials emailed to ${created.admin.email} and ${created.desk.email}` },
+    });
+    res.status(201).json({
+      organizationName: created.admin.organizationName,
+      message: `Credentials were sent to ${created.admin.email} and ${created.desk.email}.`,
+      accounts: [
+        { id: created.admin.id, fullName: created.admin.fullName, email: created.admin.email, clientAccountType: created.admin.clientAccountType },
+        { id: created.desk.id, fullName: created.desk.fullName, email: created.desk.email, clientAccountType: created.desk.clientAccountType },
+      ],
+    });
+  } catch (err: unknown) {
+    if (created) db.removeAccounts([created.admin.id, created.desk.id]);
+    const message = err instanceof Error ? err.message : 'Could not create the accounts.';
+    const status = message.includes('already exists') || message.includes('different emails') ? 400 : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.get('/reports/organization', (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Sign in required' });
+  }
+  if (currentUser.role !== 'client' || currentUser.clientAccountType !== 'organization_admin') {
+    return res.status(403).json({ error: 'Organization reports are available to the organization admin only' });
+  }
+
+  const requests = db.requests.filter((item) => sameOrganization(item.organizationName, currentUser.organizationName));
+  const accounts = db.users.filter(
+    (user) => user.role === 'client' && sameOrganization(user.organizationName, currentUser.organizationName)
+  );
+  const byLanguage: Record<string, { requests: number; minutes: number }> = {};
+  const byCategory: Record<string, { requests: number; minutes: number }> = {};
+  let totalMinutes = 0;
+
+  for (const item of requests) {
+    const minutes = minutesForRequest(item.reference);
+    totalMinutes += minutes;
+    const source = db.languages.find((language) => language.code === item.sourceLanguage);
+    const languageLabel = item.isUnknownLanguage ? 'Unknown language' : (source?.name || item.sourceLanguage);
+    const language = byLanguage[languageLabel] || { requests: 0, minutes: 0 };
+    language.requests += 1;
+    language.minutes += minutes;
+    byLanguage[languageLabel] = language;
+    const category = byCategory[item.serviceCategory] || { requests: 0, minutes: 0 };
+    category.requests += 1;
+    category.minutes += minutes;
+    byCategory[item.serviceCategory] = category;
+  }
+
+  const byAccount = accounts.map((account) => {
+    const own = requests.filter((item) => item.requesterId === account.id);
+    const minutes = own.reduce((sum, item) => sum + minutesForRequest(item.reference), 0);
+    return {
+      id: account.id,
+      fullName: account.fullName,
+      email: account.email,
+      clientAccountType: account.clientAccountType,
+      requests: own.length,
+      minutes,
+    };
+  });
+
+  res.json({
+    organizationName: currentUser.organizationName,
+    summary: {
+      totalMinutes,
+      totalRequests: requests.length,
+      completedRequests: requests.filter((item) => item.status === 'completed').length,
+      activeRequests: requests.filter((item) => ['assigned', 'in_session', 'matching', 'pending_coordinator', 'submitted'].includes(item.status)).length,
+      cancelledRequests: requests.filter((item) => item.status === 'cancelled').length,
+      emergencyRequests: requests.filter((item) => item.urgency === 'emergency').length,
+    },
+    byLanguage,
+    byCategory,
+    byAccount,
+    recent: requests
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 8)
+      .map((item) => ({
+        reference: item.reference,
+        status: item.status,
+        serviceCategory: item.serviceCategory,
+        sourceLanguage: item.sourceLanguage,
+        requesterName: item.requesterName,
+        createdAt: item.createdAt,
+        minutes: minutesForRequest(item.reference),
+      })),
+  });
+});
+
 router.get('/reports', (req: Request, res: Response) => {
   const currentUser = (req as any).user;
   if (currentUser.role !== 'supervisor' && currentUser.role !== 'platform_admin') {
@@ -1106,16 +1414,20 @@ router.get('/notifications', (req: Request, res: Response) => {
   if (!currentUser) {
     return res.status(401).json({ error: 'Sign in required' });
   }
-  const list = db.notifications.filter(n => n.recipientId === currentUser.id);
+  const list = db.notifications.filter(
+    (item) => item.recipientId === currentUser.id && item.recipientRole === currentUser.role
+  );
   res.json({ notifications: list });
 });
 
 router.patch('/notifications/:id/read', (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
   const { id } = req.params;
-  const notif = db.notifications.find(n => n.id === id);
-  if (notif) {
-    notif.read = true;
+  const notif = db.notifications.find((item) => item.id === id);
+  if (!currentUser || !notif || notif.recipientId !== currentUser.id || notif.recipientRole !== currentUser.role) {
+    return res.status(404).json({ error: 'Notification not found' });
   }
+  notif.read = true;
   res.json({ success: true, notification: notif });
 });
 // ==========================================

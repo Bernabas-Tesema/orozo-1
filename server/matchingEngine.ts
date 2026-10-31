@@ -90,14 +90,21 @@ export function findEligibleInterpreters(request: InterpretationRequest): {
       score -= 10;
     }
 
-    // Higher rating bonus
-    score += Math.round(interpreter.rating * 5);
+    const feedbackCount = db.completions.filter(
+      (item) => item.interpreterId === interpreter.id && item.clientFeedback
+    ).length;
+    score += Math.round(interpreter.rating * 40);
+    score += Math.min(40, feedbackCount * 8);
+    matchReasons.push(`Rating ${interpreter.rating.toFixed(1)} from ${feedbackCount} client review${feedbackCount === 1 ? '' : 's'}`);
 
     results.push({ interpreter, score, matchReasons });
   }
 
-  // Sort by score descending (highest quality and best fit first)
-  results.sort((a, b) => b.score - a.score);
+  results.sort((a, b) => {
+    const byScore = b.score - a.score;
+    if (byScore !== 0) return byScore;
+    return b.interpreter.rating - a.interpreter.rating;
+  });
   return results;
 }
 
@@ -123,8 +130,7 @@ export function dispatchRequest(requestReference: string): {
     req.escalationReason = 'Unknown language intake flagged. Routed to supervisor queue for human coordinator assessment.';
     req.updatedAt = new Date().toISOString();
 
-    db.createNotification({
-      recipientId: 'usr-super-1',
+    db.notifyRole('supervisor', {
       title: 'Unknown Language Escalation',
       message: `Request ${req.reference} flagged with unknown dialect. Coordinator review required.`,
       channel: 'in_app',
@@ -161,8 +167,7 @@ export function dispatchRequest(requestReference: string): {
     req.escalationReason = 'No matching verified interpreter currently available. Coordinator manual intervention required.';
     req.updatedAt = new Date().toISOString();
 
-    db.createNotification({
-      recipientId: 'usr-super-1',
+    db.notifyRole('supervisor', {
       title: 'Interpreter Unavailability Alert',
       message: `No available interpreter for ${req.reference} (${req.sourceLanguage.toUpperCase()} -> ${req.targetLanguage.toUpperCase()}).`,
       channel: 'in_app',
@@ -246,8 +251,7 @@ export function dispatchRequest(requestReference: string): {
   req.activeSessionId = session.id;
 
   // Notify interpreter
-  db.createNotification({
-    recipientId: candidate.userId,
+  db.notifyUser(candidate.userId, {
     title: `New Interpretation Assignment (${req.urgency.toUpperCase()})`,
     message: `Request ${req.reference} assigned to you: ${req.sourceLanguage.toUpperCase()} to ${req.targetLanguage.toUpperCase()} for ${req.organizationName}. Please accept within ${timeoutSec} seconds.`,
     channel: 'in_app',
@@ -328,8 +332,7 @@ export function handleAssignmentResponse(
 
     // Notify client
     if (req) {
-      db.createNotification({
-        recipientId: req.requesterId,
+      db.notifyUser(req.requesterId, {
         title: 'Interpreter Accepted Request',
         message: `${assignment.interpreterName} accepted your interpretation request (${req.reference}). Ready to connect!`,
         channel: 'in_app',

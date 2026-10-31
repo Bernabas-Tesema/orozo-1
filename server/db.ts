@@ -13,104 +13,107 @@ import {
   ServiceCategory
 } from './types';
 
-// Pre-seeded supported Ethiopian languages as per Ethiopian demographic and institutional requirements
+function language(
+  code: string,
+  name: string,
+  nativeName: string,
+  script: SupportedLanguage['script'],
+  variants: string[] = []
+): SupportedLanguage {
+  return { code, name, nativeName, script, variants, isActive: true };
+}
+
+// The first 20 are the most widely used. The rest follow the supplied catalog.
+// English and Arabic stay at the end so requests can still be interpreted into them.
 export const INITIAL_LANGUAGES: SupportedLanguage[] = [
-  {
-    code: 'amh',
-    name: 'Amharic',
-    nativeName: 'አማርኛ',
-    script: 'Ethiopic',
-    variants: ['Gondar', 'Wollo', 'Shewa', 'Gojjam'],
-    isActive: true,
-  },
-  {
-    code: 'orm',
-    name: 'Afaan Oromoo',
-    nativeName: 'Afaan Oromoo',
-    script: 'Latin',
-    variants: ['Central (Shewa)', 'Western (Wollega)', 'Eastern (Harar)', 'Southern (Boran)'],
-    isActive: true,
-  },
-  {
-    code: 'tir',
-    name: 'Tigrinya',
-    nativeName: 'ትግርኛ',
-    script: 'Ethiopic',
-    variants: ['Enderta', 'Adwa', 'Agame', 'Tembien'],
-    isActive: true,
-  },
-  {
-    code: 'som',
-    name: 'Somali',
-    nativeName: 'Af-Soomaali',
-    script: 'Latin',
-    variants: ['Ogaden', 'Jijiga', 'Shinile'],
-    isActive: true,
-  },
-  {
-    code: 'sid',
-    name: 'Sidama',
-    nativeName: 'Sidaamu Afoo',
-    script: 'Latin',
-    variants: ['Hawassa', 'Aleta Wondo', 'Yirgalem'],
-    isActive: true,
-  },
-  {
-    code: 'wal',
-    name: 'Wolaytta',
-    nativeName: 'Wolayttatto Doonaa',
-    script: 'Latin',
-    variants: ['Soddo', 'Areka', 'Boditi'],
-    isActive: true,
-  },
-  {
-    code: 'gur',
-    name: 'Gurage',
-    nativeName: 'ጉራጊኛ',
-    script: 'Ethiopic',
-    variants: ['Sebat Bet', 'Silt\'e', 'Kistane (Soddo)'],
-    isActive: true,
-  },
-  {
-    code: 'aar',
-    name: 'Afar',
-    nativeName: 'Qafaraf',
-    script: 'Latin',
-    variants: ['Northern', 'Central', 'Southern (Assab)'],
-    isActive: true,
-  },
-  {
-    code: 'had',
-    name: 'Hadiyya',
-    nativeName: 'Hadiyyisa',
-    script: 'Latin',
-    variants: ['Hosanna', 'Lemo', 'Shashogo'],
-    isActive: true,
-  },
-  {
-    code: 'gam',
-    name: 'Gamo',
-    nativeName: 'Gamotto',
-    script: 'Latin',
-    variants: ['Arba Minch', 'Chencha'],
-    isActive: true,
-  },
-  {
-    code: 'eng',
-    name: 'English',
-    nativeName: 'English',
-    script: 'Latin',
-    variants: ['International', 'Standard British', 'Standard American'],
-    isActive: true,
-  },
-  {
-    code: 'ara',
-    name: 'Arabic',
-    nativeName: 'العربية',
-    script: 'Arabic',
-    variants: ['Modern Standard', 'Gulf', 'Yemeni / Red Sea Dialect'],
-    isActive: true,
-  },
+  language('orm', 'Oromo', 'Afaan Oromoo', 'Latin', ['Central (Shewa)', 'Western (Wollega)', 'Eastern (Harar)', 'Southern (Boran)']),
+  language('amh', 'Amharic', 'አማርኛ', 'Ethiopic', ['Gondar', 'Wollo', 'Shewa', 'Gojjam']),
+  language('som', 'Somali', 'Af-Soomaali', 'Latin', ['Ogaden', 'Jijiga', 'Shinile']),
+  language('tir', 'Tigrinya', 'ትግርኛ', 'Ethiopic', ['Enderta', 'Adwa', 'Agame', 'Tembien']),
+  language('sid', 'Sidama', 'Sidaamu Afoo', 'Latin', ['Hawassa', 'Aleta Wondo', 'Yirgalem']),
+  language('wal', 'Wolaytta', 'Wolayttatto Doonaa', 'Latin', ['Soddo', 'Areka', 'Boditi']),
+  language('aar', 'Afar', 'Qafaraf', 'Latin', ['Northern', 'Central', 'Southern (Assab)']),
+  language('gam', 'Gamo', 'Gamotto', 'Latin', ['Arba Minch', 'Chencha']),
+  language('had', 'Hadiyya', 'Hadiyyisa', 'Latin', ['Hosanna', 'Lemo', 'Shashogo']),
+  language('ktb', 'Kambaata', 'Kambaatissata', 'Latin'),
+  language('drs', 'Gedeo', 'Gedeuffa', 'Latin'),
+  language('stv', "Silt'e", 'ስልጥኛ', 'Ethiopic', ['Ulbareg', 'Inneqor', 'Wolane']),
+  language('gof', 'Gofa', 'Gofatho', 'Latin'),
+  language('dwr', 'Dawro', 'Dawrotsuwa', 'Latin'),
+  language('kbr', 'Kafa', 'Kafi noono', 'Latin'),
+  language('har', 'Harari', 'ሃራሪ', 'Ethiopic'),
+  language('aiw', 'Aari', 'Aari', 'Latin'),
+  language('bcq', 'Bench', 'Benchnon', 'Latin'),
+  language('kxc', 'Konso', 'Komso', 'Latin'),
+  language('guk', 'Gumuz', 'Gumuz', 'Latin'),
+  language('awn', 'Awngi', 'Awngi', 'Latin'),
+  language('ahg', 'Qimant', 'Qimant', 'Latin'),
+  language('xan', 'Xamtanga', 'Xamtanga', 'Latin'),
+  language('bji', 'Burji', 'Burji', 'Latin'),
+  language('alw', 'Alaba', 'Alaba', 'Latin'),
+  language('liq', 'Libido', 'Libido', 'Latin'),
+  language('ssy', 'Saho', 'Saho', 'Latin'),
+  language('arv', 'Arbore', 'Arbore', 'Latin'),
+  language('bsw', 'Baiso', 'Baiso', 'Latin'),
+  language('dsh', 'Daasanach', 'Daasanach', 'Latin'),
+  language('gdl', 'Dirasha', 'Dirasha', 'Latin'),
+  language('dox', 'Bussa', 'Bussa', 'Latin'),
+  language('gwd', 'Gawwada', 'Gawwada', 'Latin'),
+  language('tsb', 'Tsamai', 'Tsamai', 'Latin'),
+  language('agj', 'Argobba', 'አርጎባ', 'Ethiopic'),
+  language('zay', 'Zay', 'ዛይ', 'Ethiopic'),
+  language('gru', 'Soddo', 'እኩኩ', 'Ethiopic'),
+  language('sgw', 'Chaha', 'ቻሃ', 'Ethiopic'),
+  language('sgz', 'Ezha', 'እዣ', 'Ethiopic'),
+  language('gmx', 'Gumer', 'ጉመር', 'Ethiopic'),
+  language('gqa', 'Gura', 'ጉራ', 'Ethiopic'),
+  language('ior', 'Inor', 'እነር', 'Ethiopic'),
+  language('gye', 'Gyeto', 'ጌቶ', 'Ethiopic'),
+  language('end', 'Endegen', 'እንደገኝ', 'Ethiopic'),
+  language('mvz', 'Mesqan', 'መስቃን', 'Ethiopic'),
+  language('muh', 'Muher', 'ሙኼር', 'Ethiopic'),
+  language('myo', 'Anfillo', 'Anfillo', 'Latin'),
+  language('myf', 'Bambassi', 'Bambassi', 'Latin'),
+  language('bst', 'Basketo', 'Basketo', 'Latin'),
+  language('bwo', 'Boro (Shinasha)', 'Borna', 'Latin'),
+  language('cra', 'Chara', 'Chara', 'Latin'),
+  language('dim', 'Dime', 'Dime', 'Latin'),
+  language('mdx', 'Dizi', 'Dizi', 'Latin'),
+  language('doz', 'Dorze', 'Dorze', 'Latin'),
+  language('gza', 'Ganza', 'Ganza', 'Latin'),
+  language('gyl', 'Gayil', 'Gayil', 'Latin'),
+  language('amf', 'Hamer-Banna', 'Hamer-Banna', 'Latin'),
+  language('hoz', 'Hozo', 'Hozo', 'Latin'),
+  language('kcx', 'Kachama-Ganjule', 'Kachama-Ganjule', 'Latin'),
+  language('kxh', 'Karo', 'Karo', 'Latin'),
+  language('kqy', 'Koorete', 'Koorete', 'Latin'),
+  language('mdy', 'Male', 'Male', 'Latin'),
+  language('mfx', 'Melo', 'Melo', 'Latin'),
+  language('noz', 'Nayi', 'Nayi', 'Latin'),
+  language('oyd', 'Oyda', 'Oyda', 'Latin'),
+  language('sze', 'Seze', 'Seze', 'Latin'),
+  language('she', 'Sheko', 'Sheko', 'Latin'),
+  language('jnj', 'Yemsa', 'Yemsa', 'Latin'),
+  language('zayz', 'Zayse-Zergulla', 'Zayse-Zergulla', 'Latin'),
+  language('anu', 'Anuak', 'Anuak', 'Latin'),
+  language('wti', 'Berta', 'Berta', 'Latin'),
+  language('koe', 'Kacipo-Balesi', 'Kacipo-Balesi', 'Latin'),
+  language('xom', 'Komo', 'Komo', 'Latin'),
+  language('kun', 'Kunama', 'Kunama', 'Latin'),
+  language('kmq', 'Kwama', 'Kwama', 'Latin'),
+  language('xwg', 'Kwegu', 'Kwegu', 'Latin'),
+  language('mpe', 'Majang', 'Majang', 'Latin'),
+  language('mym', "Me'en", "Me'en", 'Latin'),
+  language('mur', 'Murle', 'Murle', 'Latin'),
+  language('muz', 'Mursi', 'Mursi', 'Latin'),
+  language('nus', 'Nuer', 'Nuer', 'Latin'),
+  language('nnj', 'Nyangatom', 'Nyangatom', 'Latin'),
+  language('lgn', 'Opuuo', 'Opuuo', 'Latin'),
+  language('sbf', 'Shabo', 'Shabo', 'Latin'),
+  language('suq', 'Suri', 'Suri', 'Latin'),
+  language('udu', 'Uduk', 'Uduk', 'Latin'),
+  language('eng', 'English', 'English', 'Latin', ['International', 'Standard British', 'Standard American']),
+  language('ara', 'Arabic', 'العربية', 'Arabic', ['Modern Standard', 'Gulf', 'Yemeni / Red Sea Dialect']),
 ];
 
 // Pre-seeded Users across all in-scope roles:
@@ -132,7 +135,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'usr-client-common-1',
     email: 'triage.desk@tikuranbessa.gov.et',
-    fullName: 'Emergency Triage Desk #1 (Common Staff Terminal)',
+    fullName: 'Triage desk',
     role: 'client',
     clientAccountType: 'common_terminal',
     phone: '+251 91 123 4599',
@@ -385,7 +388,7 @@ export const INITIAL_INTERPRETERS: InterpreterProfile[] = [
 export const INITIAL_REQUESTS: InterpretationRequest[] = [
   {
     reference: 'REQ-2026-10821',
-    requesterId: 'usr-client-1',
+    requesterId: 'usr-client-common-1',
     requesterName: 'Dr. Solomon Bekele',
     requesterPhone: '+251 91 123 4567',
     organizationName: 'Tikur Anbessa Specialized Hospital',
@@ -406,7 +409,7 @@ export const INITIAL_REQUESTS: InterpretationRequest[] = [
   },
   {
     reference: 'REQ-2026-10822',
-    requesterId: 'usr-client-2',
+    requesterId: 'usr-client-common-2',
     requesterName: 'Meron Tadesse, Legal Counsel',
     requesterPhone: '+251 92 234 5678',
     organizationName: 'Federal First Instance Court (Arada Bench)',
@@ -443,7 +446,7 @@ export const INITIAL_REQUESTS: InterpretationRequest[] = [
   },
   {
     reference: 'REQ-2026-10824',
-    requesterId: 'usr-client-1',
+    requesterId: 'usr-client-admin-1',
     requesterName: 'Dr. Solomon Bekele',
     requesterPhone: '+251 91 123 4567',
     organizationName: 'Tikur Anbessa Specialized Hospital',
@@ -464,7 +467,7 @@ export const INITIAL_REQUESTS: InterpretationRequest[] = [
   },
   {
     reference: 'REQ-2026-10819',
-    requesterId: 'usr-client-2',
+    requesterId: 'usr-client-admin-2',
     requesterName: 'Meron Tadesse, Legal Counsel',
     requesterPhone: '+251 92 234 5678',
     organizationName: 'Federal First Instance Court (Arada Bench)',
@@ -482,6 +485,27 @@ export const INITIAL_REQUESTS: InterpretationRequest[] = [
     assignedInterpreterId: 'int-4',
     assignedInterpreterName: 'Tariku Wonche',
     activeSessionId: 'SES-9915',
+  },
+  {
+    reference: 'REQ-2026-10818',
+    requesterId: 'usr-client-common-1',
+    requesterName: 'Triage desk',
+    requesterPhone: '+251 91 123 4599',
+    organizationName: 'Tikur Anbessa Specialized Hospital',
+    sourceLanguage: 'orm',
+    targetLanguage: 'amh',
+    isUnknownLanguage: false,
+    serviceCategory: 'healthcare',
+    urgency: 'high',
+    modality: 'audio',
+    scheduleType: 'immediate',
+    status: 'completed',
+    minRoutingContext: 'Ward round for an Oromo-speaking patient after emergency intake.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
+    assignedInterpreterId: 'int-1',
+    assignedInterpreterName: 'Chaltu Kebede',
+    activeSessionId: 'SES-9910',
   },
 ];
 
@@ -566,6 +590,24 @@ export const INITIAL_COMPLETIONS: CompletionReport[] = [
     },
     createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
   },
+  {
+    id: 'cmp-500',
+    sessionId: 'SES-9910',
+    requestReference: 'REQ-2026-10818',
+    interpreterId: 'int-1',
+    interpreterName: 'Chaltu Kebede',
+    outcome: 'completed',
+    durationMinutes: 32,
+    issueCode: 'none',
+    notes: 'Completed bedside interpretation for medication instructions.',
+    reviewStatus: 'standard',
+    clientFeedback: {
+      rating: 5,
+      comment: 'Clear and calm during the ward round. The patient understood every instruction.',
+      submittedAt: new Date(Date.now() - 1000 * 60 * 190).toISOString(),
+    },
+    createdAt: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
+  },
 ];
 
 // Initial Platform Settings
@@ -584,6 +626,7 @@ export const INITIAL_NOTIFICATIONS: PlatformNotification[] = [
   {
     id: 'notif-1',
     recipientId: 'usr-interp-1',
+    recipientRole: 'interpreter',
     title: 'Emergency Healthcare Request Assigned',
     message: 'New request REQ-2026-10821: Oromo to Amharic at Tikur Anbessa Hospital.',
     channel: 'in_app',
@@ -595,6 +638,7 @@ export const INITIAL_NOTIFICATIONS: PlatformNotification[] = [
   {
     id: 'notif-2',
     recipientId: 'usr-super-1',
+    recipientRole: 'supervisor',
     title: 'Unknown Language Escalation Alert',
     message: 'REQ-2026-10824 flagged as unknown language from Tikur Anbessa pediatric unit. Coordinator review required.',
     channel: 'in_app',
@@ -687,6 +731,9 @@ class DatabaseStore {
   auditLogs: AuditLog[] = [...INITIAL_AUDIT_LOGS];
   settings: PlatformSettings = { ...INITIAL_SETTINGS };
 
+  // Passwords for accounts created by a platform admin. Demo accounts have none.
+  private passwords = new Map<string, string>();
+
   // Current active user session (simulates the authenticated context)
   currentUserId: string | null = 'usr-client-admin-1';
 
@@ -757,6 +804,141 @@ class DatabaseStore {
     };
     this.notifications.unshift(item);
     return item;
+  }
+
+  notifyUser(userId: string, notif: Omit<PlatformNotification, 'id' | 'createdAt' | 'recipientId' | 'recipientRole'>) {
+    const user = this.users.find((item) => item.id === userId);
+    if (!user) return null;
+    return this.createNotification({
+      ...notif,
+      recipientId: user.id,
+      recipientRole: user.role,
+    });
+  }
+
+  notifyRole(role: User['role'], notif: Omit<PlatformNotification, 'id' | 'createdAt' | 'recipientId' | 'recipientRole'>) {
+    return this.users
+      .filter((user) => user.role === role && user.status === 'active')
+      .map((user) => this.notifyUser(user.id, notif))
+      .filter(Boolean);
+  }
+
+  hasPassword(userId: string): boolean {
+    return this.passwords.has(userId);
+  }
+
+  checkPassword(userId: string, password: string): boolean {
+    return this.passwords.get(userId) === password;
+  }
+
+  createOrganizationAccounts(input: {
+    organizationName: string;
+    adminName: string;
+    adminEmail: string;
+    adminPassword: string;
+    deskName: string;
+    deskEmail: string;
+    deskPassword: string;
+    phone?: string;
+  }): { admin: User; desk: User } {
+    const adminEmail = input.adminEmail.trim().toLowerCase();
+    const deskEmail = input.deskEmail.trim().toLowerCase();
+    if (adminEmail === deskEmail) {
+      throw new Error('The organization admin and the triage desk need different emails.');
+    }
+    const taken = this.users.some((user) => {
+      const email = user.email.toLowerCase();
+      return email === adminEmail || email === deskEmail;
+    });
+    if (taken) {
+      throw new Error('An account with that email already exists.');
+    }
+
+    const now = new Date().toISOString();
+    const phone = input.phone?.trim() || '';
+    const admin: User = {
+      id: `usr-org-admin-${Date.now()}`,
+      email: adminEmail,
+      fullName: input.adminName.trim(),
+      role: 'client',
+      clientAccountType: 'organization_admin',
+      phone,
+      organizationName: input.organizationName.trim(),
+      status: 'active',
+      createdAt: now,
+    };
+    const desk: User = {
+      id: `usr-org-desk-${Date.now()}`,
+      email: deskEmail,
+      fullName: input.deskName.trim(),
+      role: 'client',
+      clientAccountType: 'common_terminal',
+      phone,
+      organizationName: input.organizationName.trim(),
+      status: 'active',
+      createdAt: now,
+    };
+    this.users.push(admin, desk);
+    this.passwords.set(admin.id, input.adminPassword);
+    this.passwords.set(desk.id, input.deskPassword);
+    return { admin, desk };
+  }
+
+  createInterpreterAccount(input: {
+    fullName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    languages: string[];
+    categories: ServiceCategory[];
+  }): { user: User; profile: InterpreterProfile } {
+    const email = input.email.trim().toLowerCase();
+    const taken = this.users.some((user) => user.email.toLowerCase() === email)
+      || this.interpreters.some((person) => person.email.toLowerCase() === email);
+    if (taken) {
+      throw new Error('An account with that email already exists.');
+    }
+
+    const now = new Date().toISOString();
+    const user: User = {
+      id: `usr-interp-${Date.now()}`,
+      email,
+      fullName: input.fullName.trim(),
+      role: 'interpreter',
+      phone: input.phone?.trim() || '',
+      organizationName: 'National Accredited Interpreters Registry',
+      status: 'active',
+      createdAt: now,
+    };
+    const profile: InterpreterProfile = {
+      id: `int-${Date.now()}`,
+      userId: user.id,
+      fullName: user.fullName,
+      phone: user.phone,
+      email,
+      supportedLanguages: input.languages.map((languageCode) => ({
+        languageCode,
+        proficiency: 'professional' as const,
+        pairDirection: 'bidirectional' as const,
+      })),
+      serviceCategories: input.categories,
+      qualifications: [],
+      verificationState: 'verified',
+      availability: 'available',
+      rating: 4.8,
+      totalSessionsCompleted: 0,
+    };
+    this.users.push(user);
+    this.interpreters.push(profile);
+    this.passwords.set(user.id, input.password);
+    return { user, profile };
+  }
+
+  removeAccounts(userIds: string[]) {
+    const ids = new Set(userIds);
+    this.users = this.users.filter((user) => !ids.has(user.id));
+    this.interpreters = this.interpreters.filter((person) => !ids.has(person.userId));
+    for (const id of ids) this.passwords.delete(id);
   }
 }
 

@@ -4,7 +4,7 @@ import { Building2, Headphones, Activity, Monitor, Lock, UserRound, ShieldCheck,
 
 interface LoginPageProps {
   users: User[];
-  onLogin: (user: User) => void;
+  onLogin: (user: User, password: string) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
@@ -31,7 +31,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
       users.find((u) => u.email.toLowerCase() === email.toLowerCase()) ||
       users[0];
     setTimeout(() => {
-      onLogin(target);
+      onLogin(target, password);
       setIsSubmitting(false);
     }, 250);
   };

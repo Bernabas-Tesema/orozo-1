@@ -8,6 +8,9 @@ import {
   Sparkles,
   Send,
   X,
+  Minus,
+  Maximize2,
+  Minimize2,
   Volume2,
   ShieldAlert,
   ArrowRight,
@@ -35,6 +38,8 @@ export const OrzoSupportModal: React.FC<OrzoSupportModalProps> = ({
   onSelectLanguageForRequest,
 }) => {
   const [activeTab, setActiveTab] = useState<'chat' | 'audio_id'>('chat');
+  const [minimized, setMinimized] = useState(false);
+  const [maximized, setMaximized] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -206,9 +211,23 @@ export const OrzoSupportModal: React.FC<OrzoSupportModalProps> = ({
     }
   };
 
+  if (minimized) {
+    return (
+      <div className="fixed bottom-16 right-4 z-50 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-lg">
+        <span className="text-xs font-bold text-slate-800">ORZO Support</span>
+        <button type="button" onClick={() => setMinimized(false)} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 cursor-pointer" title="Restore">
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 cursor-pointer" title="Close">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end">
-      <div className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div className={`fixed z-50 overflow-hidden bg-black/40 flex ${maximized ? 'inset-0 items-center justify-center p-4' : 'inset-0 justify-end'}`}>
+      <div className={`bg-white shadow-2xl flex flex-col ${maximized ? 'h-full w-full max-w-5xl rounded-2xl' : 'h-full w-full max-w-md'}`}>
         {/* Header: Blue Theme */}
         <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-slate-900 text-white p-4 flex items-center justify-between border-b border-blue-950">
           <div className="flex items-center space-x-3">
@@ -228,12 +247,20 @@ export const OrzoSupportModal: React.FC<OrzoSupportModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setMinimized(true)} className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-800 cursor-pointer" title="Minimize">
+              <Minus className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => setMaximized((open) => !open)} className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-800 cursor-pointer" title={maximized ? 'Restore' : 'Maximize'}>
+              {maximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Mode Switcher Tabs */}
@@ -337,10 +364,10 @@ export const OrzoSupportModal: React.FC<OrzoSupportModalProps> = ({
                 Supported Languages
               </button>
               <button
-                onClick={() => handleSendMessage('How does emergency dispatch work?')}
+                onClick={() => handleSendMessage('How does interpreter matching use ratings?')}
                 className="bg-white border border-gray-300 rounded-full px-2.5 py-1 hover:border-blue-600 shrink-0 cursor-pointer"
               >
-                Emergency Dispatch
+                Matching
               </button>
               <button
                 onClick={() => handleSendMessage('How do I use speakerphone mode?')}

@@ -5,7 +5,7 @@ import {
   Assignment,
   InterpretationRequest,
   SupportedLanguage
-} from '../types';
+} from '../shared/types';
 import {
   Headphones,
   CheckCircle2,
@@ -13,7 +13,6 @@ import {
   Clock,
   Award,
   Globe,
-  Activity,
   AlertTriangle,
   PhoneCall,
   Video,
@@ -328,46 +327,19 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
         {/* Right Col: Performance Metrics */}
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs">
-            <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center">
-              <Activity className="w-4 h-4 mr-2 text-blue-600" />
-              Performance Stats
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Sessions Completed</span>
-                  <span className="font-bold text-gray-900">{profile.totalSessionsCompleted}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '85%' }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Average Quality Rating</span>
-                  <span className="font-bold text-gray-900 flex items-center">
-                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400 mr-1" />
-                    {profile.rating.toFixed(1)} / 5.0
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-amber-500 h-2 rounded-full"
-                    style={{ width: `${(profile.rating / 5) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Attendance & Acceptance Rate</span>
-                  <span className="font-bold text-gray-900">98.2%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '98%' }} />
-                </div>
-              </div>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Your rating</h3>
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star
+                  key={n}
+                  className={`w-6 h-6 ${
+                    n <= Math.round(profile.rating)
+                      ? 'text-amber-500 fill-amber-400'
+                      : 'text-gray-200'
+                  }`}
+                />
+              ))}
+              <span className="ml-2 text-2xl font-black text-slate-900">{profile.rating.toFixed(1)}</span>
             </div>
           </div>
         </div>

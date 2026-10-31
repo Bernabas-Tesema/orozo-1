@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../shared/api';
 import {
   User,
   InterpretationRequest,
@@ -6,7 +7,7 @@ import {
   CompletionReport,
   InterpreterProfile,
   SupportedLanguage
-} from '../types';
+} from '../shared/types';
 import {
   Activity,
   AlertTriangle,
@@ -22,7 +23,8 @@ import {
   MessageSquare,
   FileText,
   PhoneCall,
-  UserCheck
+  UserCheck,
+  Star
 } from 'lucide-react';
 
 interface SupervisorWorkspaceProps {
@@ -39,7 +41,6 @@ interface SupervisorWorkspaceProps {
 }
 
 export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
-  currentUser,
   requests,
   sessions,
   completions,
@@ -50,7 +51,14 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   onResolveIssue,
   onJoinSession,
 }) => {
-  const [activeTab, setActiveTab] = useState<'unknown_language' | 'delayed_unmatched' | 'active_sessions' | 'flagged_issues'>('unknown_language');
+  const [activeTab, setActiveTab] = useState<'unknown_language' | 'delayed_unmatched' | 'active_sessions' | 'flagged_issues' | 'ratings'>('unknown_language');
+  const [ratingRows, setRatingRows] = useState<Array<{
+    id: string;
+    fullName: string;
+    rating: number;
+    comments: Array<{ rating: number; comment: string; submittedAt: string }>;
+  }>>([]);
+  const [openRatingId, setOpenRatingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -121,6 +129,13 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (activeTab !== 'ratings') return;
+    api.getInterpreterRatings()
+      .then((data) => setRatingRows(data.interpreters))
+      .catch(() => setRatingRows([]));
+  }, [activeTab]);
+
   return (
     <div className="space-y-6">
       {/* Top Coordinator Banner */}
@@ -138,15 +153,10 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
               Monitor active queues, resolve unknown dialect requests, and manage manual dispatch.
             </p>
           </div>
-          <div className="flex items-center space-x-2 shrink-0">
-            <span className="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-slate-300">
-              Coordinator: <strong>{currentUser.fullName}</strong>
-            </span>
-          </div>
         </div>
 
         {/* 4 Metric Counters */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-800">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6 pt-5 border-t border-slate-800">
           <button
             onClick={() => setActiveTab('unknown_language')}
             className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
@@ -210,6 +220,22 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             <div className="text-2xl font-black text-white">{flaggedIssuesList.length}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Post-call review</div>
           </button>
+
+          <button
+            onClick={() => setActiveTab('ratings')}
+            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+              activeTab === 'ratings'
+                ? 'bg-amber-500/20 border-amber-400 text-amber-200 ring-1 ring-amber-400'
+                : 'bg-slate-800/60 border-slate-700/80 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs text-amber-400 font-bold mb-1">
+              <span>Ratings</span>
+              <Star className="w-4 h-4" />
+            </div>
+            <div className="text-2xl font-black text-white">{interpreters.length}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Score and comments</div>
+          </button>
         </div>
       </div>
 
@@ -223,6 +249,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
               {activeTab === 'delayed_unmatched' && 'Awaiting Dispatch & Assignment'}
               {activeTab === 'active_sessions' && 'Active Sessions Monitor'}
               {activeTab === 'flagged_issues' && 'Flagged Completion Review'}
+              {activeTab === 'ratings' && 'Interpreter ratings'}
             </span>
           </div>
         </div>
@@ -427,6 +454,43 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             )}
           </div>
         )}
+
+        {activeTab === 'ratings' && (
+          <div className="grid gap-3 p-4 sm:grid-cols-2">
+            {ratingRows.map((person) => (
+              <article key={person.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <button
+                  type="button"
+                  onClick={() => setOpenRatingId(openRatingId === person.id ? null : person.id)}
+                  className="flex w-full items-center justify-between text-left cursor-pointer"
+                >
+                  <div>
+                    <p className="font-bold text-slate-900">{person.fullName}</p>
+                    <p className="mt-1 text-xs text-slate-500">{person.comments.length} comment{person.comments.length === 1 ? '' : 's'}</p>
+                  </div>
+                  <span className="flex items-center gap-1 text-lg font-black text-slate-900">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
+                    {person.rating.toFixed(1)}
+                  </span>
+                </button>
+                {openRatingId === person.id && (
+                  <div className="mt-3 space-y-2">
+                    {person.comments.length === 0 ? (
+                      <p className="text-xs text-slate-500">No comments yet.</p>
+                    ) : (
+                      person.comments.map((note) => (
+                        <div key={note.submittedAt} className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-slate-700">
+                          <span className="font-bold text-amber-800">{note.rating}/5</span>
+                          {note.comment ? ` · ${note.comment}` : ''}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* MODAL 1: RESOLVE UNKNOWN LANGUAGE */}
@@ -508,7 +572,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
                   Eligible Interpreters
                 </label>
                 <div className="max-h-48 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
-                  {interpreters.map((int) => (
+                  {[...interpreters].sort((a, b) => b.rating - a.rating).map((int) => (
                     <label
                       key={int.id}
                       className={`p-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer ${
@@ -527,7 +591,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
                         <div>
                           <div className="text-gray-900 font-bold">{int.fullName}</div>
                           <div className="text-[11px] text-gray-500">
-                            Status: {int.availability.toUpperCase()}
+                            {int.rating.toFixed(1)} stars · {int.availability}
                           </div>
                         </div>
                       </div>

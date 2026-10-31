@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { api } from '../shared/api';
 import {
   User,
   SupportedLanguage,
   InterpreterProfile,
   AuditLog,
   PlatformSettings
-} from '../types';
+} from '../shared/types';
 import {
   Building2,
   ShieldCheck,
@@ -35,6 +36,7 @@ interface PlatformAdminPortalProps {
   onAddLanguage: (data: Partial<SupportedLanguage>) => Promise<void>;
   onVerifyInterpreter: (id: string, status: string, note?: string) => Promise<void>;
   onUpdateSettings: (settings: Partial<PlatformSettings>) => Promise<void>;
+  onAccountsCreated?: () => Promise<void> | void;
 }
 
 export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
@@ -47,22 +49,29 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   onAddLanguage,
   onVerifyInterpreter,
   onUpdateSettings,
+  onAccountsCreated,
 }) => {
   const [activeTab, setActiveTab] = useState<'languages' | 'verification' | 'settings' | 'audit' | 'organizations'>('languages');
   const [orgName, setOrgName] = useState('');
-  const [orgEmail, setOrgEmail] = useState('');
-  const [orgPassword, setOrgPassword] = useState('');
-  const [orgContact, setOrgContact] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [deskName, setDeskName] = useState('');
+  const [deskEmail, setDeskEmail] = useState('');
+  const [deskPassword, setDeskPassword] = useState('');
   const [orgMessage, setOrgMessage] = useState<string | null>(null);
   const [orgError, setOrgError] = useState<string | null>(null);
   const [orgBusy, setOrgBusy] = useState(false);
-  const [registeredOrgs, setRegisteredOrgs] = useState<Array<{ id: string; organizationName: string; email: string; fullName: string }>>([]);
+  const [registeredOrgs, setRegisteredOrgs] = useState<Array<{
+    organizationName: string;
+    accounts: Array<{ id: string; fullName: string; email: string; clientAccountType?: string }>;
+  }>>([]);
   const [intName, setIntName] = useState('');
   const [intEmail, setIntEmail] = useState('');
   const [intPhone, setIntPhone] = useState('');
   const [intLanguages, setIntLanguages] = useState('amh, eng');
   const [intCategories, setIntCategories] = useState('healthcare');
-  const [storedInterpreters, setStoredInterpreters] = useState<Array<{ id: string; fullName: string; email: string; languages: string[]; categories: string[] }>>([]);
+  const [intPassword, setIntPassword] = useState('');
   const [searchAudit, setSearchAudit] = useState('');
 
   // Add Language modal
@@ -87,25 +96,9 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   const [verifyModalInt, setVerifyModalInt] = useState<{ id: string; targetState: string } | null>(null);
   const [verifyNote, setVerifyNote] = useState('');
 
-  const djangoHeaders = {
-    'Content-Type': 'application/json',
-    'X-Account-Id': currentUser.id,
-  };
-
   const loadRegistry = async () => {
-    const [orgRes, intRes] = await Promise.all([
-      fetch('/django-api/api/v1/organizations', { headers: djangoHeaders }),
-      fetch('/django-api/api/v1/interpreters', { headers: djangoHeaders }),
-    ]);
-    if (!orgRes.ok || !intRes.ok) {
-      const failed = !orgRes.ok ? orgRes : intRes;
-      const body = await failed.json().catch(() => ({}));
-      throw new Error(body.error || 'Could not load the Django registry.');
-    }
-    const orgData = await orgRes.json();
-    const intData = await intRes.json();
-    setRegisteredOrgs(orgData.organizations || []);
-    setStoredInterpreters(intData.interpreters || []);
+    const orgData = await api.listOrganizations();
+    setRegisteredOrgs(orgData.organizations);
   };
 
   useEffect(() => {
@@ -119,24 +112,25 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
     setOrgError(null);
     setOrgMessage(null);
     try {
-      const response = await fetch('/django-api/api/v1/organizations', {
-        method: 'POST',
-        headers: djangoHeaders,
-        body: JSON.stringify({
-          organizationName: orgName,
-          email: orgEmail,
-          password: orgPassword,
-          contactName: orgContact,
-        }),
+      const created = await api.createOrganizationAccounts({
+        organizationName: orgName,
+        adminName,
+        adminEmail,
+        adminPassword,
+        deskName: deskName || `${orgName} triage desk`,
+        deskEmail,
+        deskPassword,
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Registration failed.');
-      setOrgMessage(body.message || 'Credentials were sent.');
+      setOrgMessage(created.message);
       setOrgName('');
-      setOrgEmail('');
-      setOrgPassword('');
-      setOrgContact('');
+      setAdminName('');
+      setAdminEmail('');
+      setAdminPassword('');
+      setDeskName('');
+      setDeskEmail('');
+      setDeskPassword('');
       await loadRegistry();
+      await onAccountsCreated?.();
     } catch (err: any) {
       setOrgError(err.message);
     } finally {
@@ -150,23 +144,19 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
     setOrgError(null);
     setOrgMessage(null);
     try {
-      const response = await fetch('/django-api/api/v1/interpreters', {
-        method: 'POST',
-        headers: djangoHeaders,
-        body: JSON.stringify({
-          fullName: intName,
-          email: intEmail,
-          phone: intPhone,
-          languages: intLanguages.split(',').map((item) => item.trim()).filter(Boolean),
-          categories: intCategories.split(',').map((item) => item.trim()).filter(Boolean),
-        }),
+      const created = await api.createInterpreter({
+        fullName: intName,
+        email: intEmail,
+        password: intPassword,
+        phone: intPhone,
+        languages: intLanguages.split(',').map((item) => item.trim()).filter(Boolean),
+        categories: intCategories.split(',').map((item) => item.trim()).filter(Boolean),
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Could not store the interpreter.');
-      setOrgMessage(`${body.interpreter.fullName} is stored in the database.`);
+      setOrgMessage(created.message);
       setIntName('');
       setIntEmail('');
       setIntPhone('');
+      setIntPassword('');
       await loadRegistry();
     } catch (err: any) {
       setOrgError(err.message);
@@ -335,35 +325,54 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
       {activeTab === 'organizations' && (
         <div className="grid gap-6 lg:grid-cols-2">
           <form onSubmit={registerOrganization} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-3">
-            <h3 className="text-sm font-bold text-gray-900">Register an organization</h3>
-            <p className="text-xs text-gray-500">The organization name and password are saved, and the login credentials are emailed to the address below.</p>
+            <h3 className="text-sm font-bold text-gray-900">Open an organization</h3>
+            <p className="text-xs text-gray-500">Each organization gets an admin account and a triage desk. The sign-in details are emailed to each address and are not shown here again.</p>
             <input value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder="Organization name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={orgContact} onChange={(e) => setOrgContact(e.target.value)} placeholder="Admin contact name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={orgEmail} onChange={(e) => setOrgEmail(e.target.value)} required type="email" placeholder="Email for the credentials" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={orgPassword} onChange={(e) => setOrgPassword(e.target.value)} required type="password" minLength={6} placeholder="Password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 pt-1">Organization admin</p>
+            <input value={adminName} onChange={(e) => setAdminName(e.target.value)} required placeholder="Admin full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required type="email" placeholder="Admin email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required type="password" minLength={6} placeholder="Admin password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 pt-1">Triage desk</p>
+            <input value={deskName} onChange={(e) => setDeskName(e.target.value)} placeholder="Desk name (optional)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={deskEmail} onChange={(e) => setDeskEmail(e.target.value)} required type="email" placeholder="Triage desk email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={deskPassword} onChange={(e) => setDeskPassword(e.target.value)} required type="password" minLength={6} placeholder="Triage desk password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <button disabled={orgBusy} className="bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
-              {orgBusy ? 'Saving...' : 'Register and send credentials'}
+              {orgBusy ? 'Sending...' : 'Create accounts and email credentials'}
             </button>
-            <ul className="text-xs text-gray-600 space-y-1 pt-2">
-              {registeredOrgs.map((org) => (
-                <li key={org.id}>{org.organizationName} — {org.email}</li>
-              ))}
-            </ul>
           </form>
 
+          <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-5">
+            <h3 className="text-sm font-bold text-gray-900">Organizations</h3>
+            <div className="mt-3 space-y-3">
+              {registeredOrgs.map((org) => (
+                <div key={org.organizationName} className="border border-gray-100 rounded-lg p-3">
+                  <div className="text-xs font-bold text-gray-900">{org.organizationName}</div>
+                  <ul className="mt-1 space-y-1">
+                    {org.accounts.map((account) => (
+                      <li key={account.id} className="text-xs text-gray-600">
+                        {account.clientAccountType === 'organization_admin' ? 'Admin' : 'Triage'} — {account.fullName} ({account.email})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <form onSubmit={saveInterpreter} className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-3">
-            <h3 className="text-sm font-bold text-gray-900">Store an interpreter</h3>
-            <p className="text-xs text-gray-500">Interpreter records are written to the Django database and used when a request is matched.</p>
+            <h3 className="text-sm font-bold text-gray-900">Add an interpreter</h3>
+            <p className="text-xs text-gray-500">The interpreter can sign in with the email and password. Those credentials are sent to their email.</p>
             <input value={intName} onChange={(e) => setIntName(e.target.value)} required placeholder="Full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input value={intEmail} onChange={(e) => setIntEmail(e.target.value)} required type="email" placeholder="Email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input value={intPassword} onChange={(e) => setIntPassword(e.target.value)} required type="password" minLength={6} placeholder="Password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input value={intPhone} onChange={(e) => setIntPhone(e.target.value)} placeholder="Phone" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input value={intLanguages} onChange={(e) => setIntLanguages(e.target.value)} placeholder="Languages, comma separated (amh, eng)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <input value={intCategories} onChange={(e) => setIntCategories(e.target.value)} placeholder="Categories, comma separated (healthcare)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <button disabled={orgBusy} className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
-              Save interpreter
+              {orgBusy ? 'Sending...' : 'Add interpreter and email credentials'}
             </button>
             <ul className="text-xs text-gray-600 space-y-1 pt-2 max-h-40 overflow-auto">
-              {storedInterpreters.map((person) => (
+              {interpreters.map((person) => (
                 <li key={person.id}>{person.fullName} — {person.email}</li>
               ))}
             </ul>

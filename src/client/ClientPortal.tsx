@@ -7,22 +7,18 @@ import {
   UrgencyLevel,
   CommunicationMode,
   ScheduleType
-} from '../types';
+} from '../shared/types';
+import { WindowFrame } from '../shared/components/WindowFrame';
+import { OrgReport } from './OrgReport';
 import {
   PlusCircle,
-  Clock,
   AlertTriangle,
   PhoneCall,
   Video,
   Volume2,
-  Calendar,
   Building2,
-  CheckCircle2,
   XCircle,
-  HelpCircle,
   ArrowRight,
-  RefreshCw,
-  Star,
   Monitor
 } from 'lucide-react';
 
@@ -68,7 +64,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [isUnknownLanguage, setIsUnknownLanguage] = useState(false);
   const [unknownNotes, setUnknownNotes] = useState('');
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('healthcare');
-  const [urgency, setUrgency] = useState<UrgencyLevel>('emergency');
+  const [urgency, setUrgency] = useState<UrgencyLevel>('standard');
   const [modality, setModality] = useState<CommunicationMode>('audio');
   const [scheduleType, setScheduleType] = useState<ScheduleType>('immediate');
   const [scheduledTime, setScheduledTime] = useState('');
@@ -79,6 +75,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [cancelReason, setCancelReason] = useState('');
 
   const isOrgAdmin = currentUser.clientAccountType === 'organization_admin';
+  const [workspace, setWorkspace] = useState<'triage' | 'report'>('triage');
 
   useEffect(() => {
     if (!initialSourceLanguage) return;
@@ -180,6 +177,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const activeLanguages = languages.filter((l) => l.isActive);
 
   return (
+    <WindowFrame title={isOrgAdmin ? 'Organization workspace' : 'Triage desk'}>
     <div className="space-y-6">
       {/* Top Banner: Crisp, purposeful, and Blue */}
       <div className="bg-slate-900 rounded-2xl p-6 sm:p-7 text-white shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -200,18 +198,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           <button
             onClick={() => {
               setScheduleType('immediate');
-              setUrgency('emergency');
-              setShowModal(true);
-            }}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm text-xs flex items-center space-x-1.5 cursor-pointer"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>Emergency Dispatch</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setScheduleType('immediate');
               setUrgency('standard');
               setShowModal(true);
             }}
@@ -223,6 +209,31 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       </div>
 
+      {isOrgAdmin && (
+        <div className="bg-white border border-gray-200 rounded-xl p-1.5 flex gap-1 w-fit">
+          <button
+            onClick={() => setWorkspace('triage')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
+              workspace === 'triage' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Triage desk
+          </button>
+          <button
+            onClick={() => setWorkspace('report')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
+              workspace === 'report' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Organization report
+          </button>
+        </div>
+      )}
+
+      {isOrgAdmin && workspace === 'report' ? (
+        <OrgReport />
+      ) : (
+      <>
       {/* Requests Section */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50/70">
@@ -252,118 +263,72 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="grid gap-3 p-4">
             {requests.map((req) => {
               const badge = getStatusBadge(req.status);
               const sourceLangObj = languages.find((l) => l.code === req.sourceLanguage);
               const targetLangObj = languages.find((l) => l.code === req.targetLanguage);
+              const sourceName = req.isUnknownLanguage ? 'Unknown language' : (sourceLangObj?.name || req.sourceLanguage);
+              const targetName = targetLangObj?.name || req.targetLanguage;
+              const when = new Date(req.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+              const modalityLabel = req.modality === 'phone_assisted' ? 'Speakerphone' : req.modality;
 
               return (
-                <div key={req.reference} className="p-4 hover:bg-gray-50/70 transition-colors">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
-                          {req.reference}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full border ${badge.className}`}>
-                          {badge.label}
-                        </span>
-                        {req.urgency === 'emergency' && (
-                          <span className="text-[10px] bg-red-600 text-white font-black uppercase px-2 py-0.5 rounded-full">
-                            Emergency
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 font-semibold uppercase">
-                          {req.serviceCategory.replace('_', ' ')}
-                        </span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500 flex items-center">
-                          {req.modality === 'video' && <Video className="w-3.5 h-3.5 mr-1 text-purple-600" />}
-                          {req.modality === 'audio' && <Volume2 className="w-3.5 h-3.5 mr-1 text-blue-600" />}
-                          {req.modality === 'phone_assisted' && <PhoneCall className="w-3.5 h-3.5 mr-1 text-amber-600" />}
-                          {req.modality === 'phone_assisted' ? 'Speakerphone' : req.modality}
-                        </span>
-                      </div>
-
-                      {/* Language Pair */}
-                      <div className="flex items-center space-x-2 text-xs">
-                        {req.isUnknownLanguage ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
-                            <HelpCircle className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                            Unknown Dialect (Coordinator Escalation)
-                          </span>
-                        ) : (
-                          <div className="font-bold text-gray-900 flex items-center space-x-1.5">
-                            <span className="text-blue-800">
-                              {sourceLangObj ? `${sourceLangObj.name} (${sourceLangObj.nativeName})` : req.sourceLanguage.toUpperCase()}
-                            </span>
-                            <span className="text-gray-400">➔</span>
-                            <span className="text-blue-800">
-                              {targetLangObj ? `${targetLangObj.name} (${targetLangObj.nativeName})` : req.targetLanguage.toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Context */}
-                      <p className="text-xs text-gray-600 max-w-2xl line-clamp-1">
-                        <strong>Context: </strong>{req.minRoutingContext}
-                      </p>
-
-                      {req.assignedInterpreterName && (
-                        <div className="text-xs text-blue-900 bg-blue-50 border border-blue-200 rounded-md p-1.5 flex items-center space-x-1.5 max-w-sm">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span>
-                            <strong>Interpreter:</strong> {req.assignedInterpreterName}
-                          </span>
-                        </div>
-                      )}
+                <article key={req.reference} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-[11px] font-semibold text-slate-400">{req.reference}</p>
+                      <p className="text-lg font-black text-slate-900">{sourceName} → {targetName}</p>
                     </div>
-
-                    {/* Right Action Buttons */}
-                    <div className="flex items-center space-x-2 shrink-0">
-                      <div className="text-[11px] text-gray-400 flex items-center mr-2">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-
-                      {['assigned', 'in_session'].includes(req.status) && req.activeSessionId && (
-                        <button
-                          onClick={() => onJoinSession(req.activeSessionId!)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-xs flex items-center space-x-1 transition-colors cursor-pointer"
-                        >
-                          <PhoneCall className="w-3.5 h-3.5" />
-                          <span>Join Room</span>
-                        </button>
-                      )}
-
-                      {req.status === 'completed' && req.activeSessionId && (
-                        <button
-                          onClick={() => onOpenFeedback(req.activeSessionId!)}
-                          className="bg-amber-50 text-amber-800 border border-amber-300 font-semibold text-xs px-2.5 py-1.5 rounded-lg hover:bg-amber-100 flex items-center space-x-1 cursor-pointer"
-                        >
-                          <Star className="w-3 h-3 text-amber-600 fill-amber-500" />
-                          <span>Rate</span>
-                        </button>
-                      )}
-
-                      {!['completed', 'cancelled'].includes(req.status) && (
-                        <button
-                          onClick={() => setCancelModalRef(req.reference)}
-                          className="text-gray-400 hover:text-red-600 text-xs px-2 py-1 rounded cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                      {badge.label}
+                    </span>
                   </div>
-                </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-2 py-1">{when}</span>
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-800">{req.serviceCategory.replaceAll('_', ' ')}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 capitalize">{modalityLabel}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 capitalize">{req.urgency}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1">{req.requesterName}</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">{req.minRoutingContext}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-800">
+                    {req.assignedInterpreterName ? `Interpreter: ${req.assignedInterpreterName}` : 'Waiting for an interpreter'}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2">
+                    {['assigned', 'in_session'].includes(req.status) && req.activeSessionId && (
+                      <button
+                        onClick={() => onJoinSession(req.activeSessionId!)}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
+                      >
+                        Join
+                      </button>
+                    )}
+                    {req.status === 'completed' && req.activeSessionId && (
+                      <button
+                        onClick={() => onOpenFeedback(req.activeSessionId!)}
+                        className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 cursor-pointer"
+                      >
+                        Rate
+                      </button>
+                    )}
+                    {!['completed', 'cancelled'].includes(req.status) && (
+                      <button
+                        onClick={() => setCancelModalRef(req.reference)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-600 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </article>
               );
             })}
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* New Request Modal */}
       {showModal && (
@@ -621,5 +586,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       )}
     </div>
+    </WindowFrame>
   );
 };

@@ -83,6 +83,19 @@ export const api = {
   },
 
   // Interpreters
+  async createInterpreter(data: {
+    fullName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    languages: string[];
+    categories: string[];
+  }): Promise<{ interpreter: InterpreterProfile; message: string }> {
+    return request('/interpreters', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
   async getInterpreters(filters?: {
     category?: string;
     language?: string;
@@ -218,6 +231,17 @@ export const api = {
   },
 
   // Supervisor
+  async getInterpreterRatings(): Promise<{
+    interpreters: Array<{
+      id: string;
+      fullName: string;
+      rating: number;
+      totalSessionsCompleted: number;
+      comments: Array<{ rating: number; comment: string; submittedAt: string; requestReference: string }>;
+    }>;
+  }> {
+    return request('/supervisor/interpreter-ratings');
+  },
   async getSupervisorQueue(): Promise<{
     pendingMatching: InterpretationRequest[];
     unknownLanguageEscalations: InterpretationRequest[];
@@ -257,6 +281,65 @@ export const api = {
   },
 
   // Reports, Audit & Settings
+  async listOrganizations(): Promise<{
+    organizations: Array<{
+      organizationName: string;
+      accounts: Array<{ id: string; fullName: string; email: string; clientAccountType?: string }>;
+    }>;
+  }> {
+    return request('/organizations');
+  },
+  async createOrganizationAccounts(data: {
+    organizationName: string;
+    adminName: string;
+    adminEmail: string;
+    adminPassword: string;
+    deskName: string;
+    deskEmail: string;
+    deskPassword: string;
+    phone?: string;
+  }): Promise<{
+    organizationName: string;
+    message: string;
+    accounts: Array<{ id: string; fullName: string; email: string; clientAccountType?: string }>;
+  }> {
+    return request('/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async getOrganizationReport(): Promise<{
+    organizationName: string;
+    summary: {
+      totalMinutes: number;
+      totalRequests: number;
+      completedRequests: number;
+      activeRequests: number;
+      cancelledRequests: number;
+      emergencyRequests: number;
+    };
+    byLanguage: Record<string, { requests: number; minutes: number }>;
+    byCategory: Record<string, { requests: number; minutes: number }>;
+    byAccount: Array<{
+      id: string;
+      fullName: string;
+      email: string;
+      clientAccountType?: string;
+      requests: number;
+      minutes: number;
+    }>;
+    recent: Array<{
+      reference: string;
+      status: string;
+      serviceCategory: string;
+      sourceLanguage: string;
+      requesterName: string;
+      createdAt: string;
+      minutes: number;
+    }>;
+  }> {
+    return request('/reports/organization');
+  },
   async getReports(): Promise<{
     summary: any;
     languageDemand: Record<string, number>;
