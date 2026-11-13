@@ -191,7 +191,14 @@ async function loadDocuments(client: pg.PoolClient) {
 }
 
 export async function connectPortalDatabase(): Promise<boolean> {
-  const client = await pool.connect();
+  let client: pg.PoolClient;
+  try {
+    client = await pool.connect();
+  } catch (error) {
+    console.error('PostgreSQL connection failed. The portal is using its built-in records.', error);
+    return false;
+  }
+
   try {
     await client.query(`ALTER TABLE api_interpreter ADD COLUMN IF NOT EXISTS qualifications JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await client.query(`ALTER TABLE api_interpreter ADD COLUMN IF NOT EXISTS total_sessions_completed INTEGER NOT NULL DEFAULT 0`);

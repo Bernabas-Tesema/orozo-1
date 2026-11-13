@@ -70,7 +70,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <a href="#top" className="flex items-center gap-2 shrink-0">
             <img src="/orzo-logo.png" alt="ORZO" className="h-11 w-11 rounded-full" />
-            <span className="font-bold text-lg tracking-tight">Orzo</span>
+            <span className="leading-tight">
+              <span className="block font-black text-lg tracking-[0.18em]">ORZO</span>
+              <span className="block text-[10px] uppercase tracking-[0.14em] text-slate-500">Language access platform</span>
+            </span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
             <a href="#about" className="hover:text-teal-800">About Orzo</a>
@@ -91,11 +94,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
       <main id="top" className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <section id="about" className="bg-white rounded-2xl border border-slate-200 p-6 md:p-10 grid md:grid-cols-2 gap-8 items-center">
           <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-[#123044]">
-              Bridge Language Barriers with Orzo
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-teal-700">ORZO</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">Language access platform</p>
+            <h1 className="mt-3 text-3xl md:text-4xl font-black tracking-tight text-[#123044]">
+              Bridge language barriers across Ethiopia
             </h1>
             <p className="mt-3 text-slate-600 max-w-md">
-              Connect with professional interpreters and communicate without limits across hospitals, courts, and public desks.
+              Connect hospitals, courts, immigration desks, and public services with trusted interpreters.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button type="button" onClick={onLogin} className="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-5 py-2.5 rounded-full cursor-pointer">

@@ -12,6 +12,8 @@ class Account(models.Model):
     organization_name = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=32, default="active")
     password_hash = models.CharField(max_length=256)
+    must_change_password = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         verbose_name = "Organization account"
@@ -19,6 +21,47 @@ class Account(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class WebSession(models.Model):
+    """Bearer token sessions for the React portal (all roles)."""
+
+    token = models.CharField(primary_key=True, max_length=64)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="web_sessions")
+    created_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Portal web session"
+        verbose_name_plural = "Portal web sessions"
+
+
+class PlatformSettings(models.Model):
+    """Singleton-style platform settings for the portal."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    assignment_timeout_seconds = models.PositiveIntegerField(default=45)
+    max_auto_retries = models.PositiveIntegerField(default=3)
+    emergency_priority_bypass = models.BooleanField(default=True)
+    allow_direct_recording = models.BooleanField(default=False)
+    maintenance_mode = models.BooleanField(default=False)
+    telecom_low_bandwidth_preset = models.BooleanField(default=True)
+    system_banner_notice = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = "Platform settings"
+        verbose_name_plural = "Platform settings"
+
+    def to_api(self) -> dict:
+        return {
+            "assignmentTimeoutSeconds": self.assignment_timeout_seconds,
+            "maxAutoRetries": self.max_auto_retries,
+            "emergencyPriorityBypass": self.emergency_priority_bypass,
+            "allowDirectRecording": self.allow_direct_recording,
+            "maintenanceMode": self.maintenance_mode,
+            "telecomLowBandwidthPreset": self.telecom_low_bandwidth_preset,
+            "systemBannerNotice": self.system_banner_notice,
+        }
 
 
 class Language(models.Model):

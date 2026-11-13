@@ -3,7 +3,14 @@ from datetime import timedelta
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 
-from .models import Account, InterpretationRequest, InterpretationSession, Interpreter, Language
+from .models import (
+    Account,
+    InterpretationRequest,
+    InterpretationSession,
+    Interpreter,
+    Language,
+    PlatformSettings,
+)
 
 DEMO_PASSWORD = make_password("orzo")
 
@@ -27,6 +34,11 @@ ACCOUNTS = [
     ("usr-client-admin-2", "admin.tadesse@moj.gov.et", "Meron Tadesse", "client", "organization_admin", "+251 92 234 5678", "Federal First Instance Court (Arada Bench)"),
     ("usr-client-common-2", "registry.desk@moj.gov.et", "Bench Room 3 Registry", "client", "common_terminal", "+251 92 234 5699", "Federal First Instance Court (Arada Bench)"),
     ("usr-admin-1", "admin.dawit@elip.et", "Dawit Mengistu", "platform_admin", "", "+251 91 888 9999", "Ministry of Innovation & Technology / ELIP Operations"),
+    ("usr-super-1", "coord.hanna@orzo.et", "Hanna Alemu", "supervisor", "", "+251 91 700 1001", "ORZO Coordination Desk"),
+    ("usr-interp-1", "chaltu.kebede@interpreters.et", "Chaltu Kebede", "interpreter", "", "+251 91 555 0101", "ORZO Interpreters"),
+    ("usr-interp-2", "berhane.gebre@interpreters.et", "Berhane Gebremariam", "interpreter", "", "+251 91 555 0202", "ORZO Interpreters"),
+    ("usr-interp-3", "faduma.omar@interpreters.et", "Faduma Omar Hassan", "interpreter", "", "+251 91 555 0303", "ORZO Interpreters"),
+    ("usr-interp-4", "tariku.wonche@interpreters.et", "Tariku Wonche", "interpreter", "", "+251 91 555 0404", "ORZO Interpreters"),
 ]
 
 INTERPRETERS = [
@@ -113,6 +125,7 @@ def seed_if_empty():
         connection_health="optimal",
     )
     Interpreter.objects.filter(pk="int-1").update(availability="busy")
+    PlatformSettings.objects.get_or_create(pk=1)
     _seed_communications()
     return True
 

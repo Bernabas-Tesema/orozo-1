@@ -5,6 +5,7 @@ import { FeedbackModal } from '../shared/components/FeedbackModal';
 import { Header } from '../shared/components/Header';
 import { LiveSessionRoom } from '../shared/components/LiveSessionRoom';
 import { ChangePasswordPage } from '../shared/components/ChangePasswordPage';
+import { LandingPage } from '../shared/components/LandingPage';
 import { LoginPage } from '../shared/components/LoginPage';
 import { NotificationDrawer } from '../shared/components/NotificationDrawer';
 import { OrzoSupportModal } from '../shared/components/OrzoSupportModal';
@@ -26,6 +27,7 @@ export default function App() {
   const portal = usePortal();
   const { currentUser, settings, loading, error } = portal;
   const [inviteEmail, setInviteEmail] = useState<string | null>(inviteEmailFromLocation);
+  const [showLogin, setShowLogin] = useState(false);
 
   const activeSessionForUser = (() => {
     if (!currentUser || currentUser.role === 'platform_admin' || currentUser.role === 'supervisor') return undefined;
@@ -111,7 +113,17 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginPage onLogin={portal.handleLogin} />;
+    if (showLogin) {
+      return (
+        <LoginPage
+          onLogin={async (email, password) => {
+            await portal.handleLogin(email, password);
+            setShowLogin(false);
+          }}
+        />
+      );
+    }
+    return <LandingPage onLogin={() => setShowLogin(true)} />;
   }
 
   if (currentUser.mustChangePassword) {

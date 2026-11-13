@@ -1,0 +1,7 @@
+# cPanel Apache + Passenger for the Django API.
+# Prefer configuring the startup file in "Setup Python App".
+# Keep this file only if the Python app is served from this directory.
+
+PassengerEnabled on
+PassengerAppType wsgi
+PassengerStartupFile passenger_wsgi.py

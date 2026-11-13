@@ -1,0 +1,13 @@
+# cPanel / Apache Passenger for the ORZO Node portal.
+# Application root should be this repository folder.
+# Startup file in "Setup Node.js App": app.js
+
+PassengerEnabled on
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerNodejs /home/CPANELUSER/nodevenv/orzo/20/bin/node
+
+# If the Node app is mounted at the domain root, keep requests in-app.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ app.js [QSA,L]

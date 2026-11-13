@@ -50,3 +50,19 @@ The first launch plays an intro: the ORZO mark, then one animated card for each 
 ## Web portal
 
 From the repository root, `npm run dev` still starts the staff console. The phone control in the header is only an on-screen preview. The field client is `frontend/field-app`.
+
+## cPanel deployment
+
+Production setup for cPanel is **Django-only** (no Node.js on the server): build the React portal with `npm run build:web`, upload `backend/` (including `frontend_dist/`), and point one Python app at the domain. `/` is the auth page for all roles; `/admin/` is Django admin. See [`deploy/cpanel/CPANEL.md`](deploy/cpanel/CPANEL.md).
+
+```bash
+# portal production build (creates app.js + frontend/dist)
+npm install
+npm run build
+
+# django
+cd backend
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+```

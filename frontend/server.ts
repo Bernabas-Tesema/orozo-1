@@ -4,23 +4,34 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const frontendRoot = __dirname;
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+const moduleDir = path.dirname(__filename);
+// tsx runs from frontend/; cPanel Passenger runs the bundled app.js from the repo root.
+const frontendRoot =
+  path.basename(moduleDir) === 'frontend' ? moduleDir : path.join(moduleDir, 'frontend');
+dotenv.config({ path: path.resolve(frontendRoot, '../.env') });
 
 const { createApiApp } = await import('./server/app');
 const { connectPortalDatabase } = await import('./server/postgresStore');
+
+const passengerGlobal = (globalThis as typeof globalThis & {
+  PhusionPassenger?: { configure: (options: { autoInstall: boolean }) => void };
+}).PhusionPassenger;
+const isPassenger = typeof passengerGlobal !== 'undefined';
+if (isPassenger) {
+  passengerGlobal.configure({ autoInstall: false });
+}
 
 async function startServer() {
   await connectPortalDatabase();
   const app = createApiApp();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
+  const djangoBase = (process.env.DJANGO_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
-  // Django client API: organization registration and interpreter records.
-  // Local only. Vercel cannot reach a Django process on this machine.
+  // Proxy organization / interpreter Django routes. On cPanel set DJANGO_API_URL
+  // to the Python app URL (e.g. https://api.yourdomain.com).
   app.use('/django-api', async (req, res) => {
-    const target = `http://127.0.0.1:8000${req.originalUrl.replace(/^\/django-api/, '')}`;
+    const target = `${djangoBase}${req.originalUrl.replace(/^\/django-api/, '')}`;
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const accountId = req.header('x-account-id');
@@ -33,7 +44,9 @@ async function startServer() {
       const text = await response.text();
       res.status(response.status).type('application/json').send(text);
     } catch {
-      res.status(502).json({ error: 'The ORZO Django API is not running on port 8000.' });
+      res.status(502).json({
+        error: `The ORZO Django API is not reachable at ${djangoBase}.`,
+      });
     }
   });
 
@@ -49,14 +62,22 @@ async function startServer() {
   } else {
     const distPath = path.resolve(frontendRoot, 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/django-api')) {
+        return next();
+      }
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Ethiopian Interpretation Platform running on http://localhost:${PORT}`);
-  });
+  const onListen = () => {
+    const where = isPassenger ? 'Phusion Passenger' : `http://localhost:${PORT}`;
+    console.log(`Ethiopian Interpretation Platform running on ${where}`);
+  };
+
+  const server = isPassenger
+    ? app.listen('passenger', onListen)
+    : app.listen(PORT, '0.0.0.0', onListen);
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {

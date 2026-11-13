@@ -5,8 +5,13 @@ __pycache__/
 *.pyc
 build/
 dist/
+frontend/dist/
+backend/frontend_dist/
+staticfiles/
+app.js
 coverage/
 .DS_Store
 *.log
 .env*
 !.env.example
+!.env.*.example
