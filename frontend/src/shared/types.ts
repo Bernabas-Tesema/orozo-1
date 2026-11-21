@@ -112,6 +112,10 @@ export interface InterpretationRequest {
   cancellationReason?: string;
   escalatedToSupervisorAt?: string;
   escalationReason?: string;
+  // Set only on waiting-calls API response
+  assignmentExpiresAt?: string | null;
+  assignmentId?: string | null;
+  queued?: boolean;
 }
 
 export type AssignmentOutcome = 'pending' | 'accepted' | 'rejected' | 'expired' | 'reassigned';
@@ -165,6 +169,8 @@ export interface InterpretationSession {
   serviceCategory: ServiceCategory;
   connectionHealth: 'optimal' | 'fair' | 'poor' | 'reconnecting';
   authorizedParticipantIds: string[];
+  /** Shared LiveKit room id (orzo-<requestReference>), like Eliotel's gcall-<classId>. */
+  callRoom?: string;
 }
 
 export type CompletionOutcome = 'completed' | 'interrupted' | 'not_completed';
@@ -236,4 +242,26 @@ export interface PlatformSettings {
   maintenanceMode: boolean;
   telecomLowBandwidthPreset: boolean;
   systemBannerNotice: string;
+}
+
+export interface MeetingParticipant {
+  id: string;
+  accountId: string;
+  accountName: string;
+  accountRole: string;
+  role: 'host' | 'participant';
+  status: 'invited' | 'joined' | 'left';
+  joinedAt?: string;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  creatorId: string;
+  creatorName: string;
+  communicationMode: CommunicationMode;
+  status: 'active' | 'ended';
+  createdAt: string;
+  endedAt?: string;
+  participants: MeetingParticipant[];
 }

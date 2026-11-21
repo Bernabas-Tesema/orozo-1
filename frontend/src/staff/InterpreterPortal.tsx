@@ -35,6 +35,7 @@ interface InterpreterPortalProps {
   onToggleAvailability: (status: 'available' | 'busy' | 'offline') => Promise<void>;
   onRespondAssignment: (assignmentId: string, response: 'accepted' | 'rejected', reason?: string) => Promise<void>;
   onJoinSession: (sessionId: string) => void;
+  onTakeWaitingCall?: (reference: string) => Promise<void>;
 }
 
 export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
@@ -43,8 +44,10 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
   assignments,
   requests,
   languages,
+  onToggleAvailability,
   onRespondAssignment,
   onJoinSession,
+  onTakeWaitingCall,
 }) => {
   const [rejectingAssignmentId, setRejectingAssignmentId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('clinical_conflict');
@@ -77,9 +80,9 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
     setPhotoUrl(profile.photoUrl || '');
   }, [profile?.id]);
 
-  const pendingAssignment = assignments.find(
-    (item) => item.outcome === 'pending' && item.interpreterId === profile?.id,
-  );
+  // Server already scopes /assignments to this interpreter — do not re-filter by id
+  // (id mismatches previously hid the incoming ring UI).
+  const pendingAssignment = assignments.find((item) => item.outcome === 'pending');
   const [now, setNow] = useState(Date.now());
   const expiredFor = useRef<string | null>(null);
   const timeLeft = pendingAssignment
@@ -91,8 +94,27 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Poll live waiting calls (calls ringing right now with countdown)
+  const [waitingCalls, setWaitingCalls] = useState<InterpretationRequest[]>([]);
+  const [takingWaitingCall, setTakingWaitingCall] = useState<string | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    const fetch = async () => {
+      try {
+        const res = await api.getWaitingCalls();
+        setWaitingCalls(res.waitingCalls || []);
+      } catch { /* ignore */ }
+    };
+    fetch();
+    const timer = setInterval(fetch, 3000);
+    return () => clearInterval(timer);
+  }, [profile?.id]);
+
   useEffect(() => {
     if (!pendingAssignment || timeLeft > 0 || expiredFor.current === pendingAssignment.id) return;
+    // Guard against clock-skew instantly expiring a brand-new ring.
+    const assignedMs = new Date(pendingAssignment.assignedAt).getTime();
+    if (Number.isFinite(assignedMs) && Date.now() - assignedMs < 5000) return;
     expiredFor.current = pendingAssignment.id;
     api.expireAssignment(pendingAssignment.id).catch(() => undefined);
   }, [pendingAssignment, timeLeft]);
@@ -430,6 +452,38 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
       <p className="text-xs font-bold uppercase tracking-wider text-white/70">
         Platform status: <span className="text-white">{detectedStatus}</span>
       </p>
+      <div className="rounded-2xl border border-white/15 bg-gradient-to-r from-white/10 to-white/5 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">Availability</p>
+            <p className="mt-1 text-sm font-black text-white">{detectedStatus}</p>
+          </div>
+          <div className="flex rounded-xl border border-white/15 bg-slate-950/30 p-1">
+            {([
+              ['available', 'Available'],
+              ['busy', 'Busy'],
+              ['offline', 'Offline'],
+            ] as const).map(([status, label]) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => onToggleAvailability(status)}
+                className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer ${
+                  profile.availability === status
+                    ? status === 'available'
+                      ? 'bg-emerald-500 text-white'
+                      : status === 'busy'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-slate-600 text-white'
+                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setDetail('languages')} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 text-[11px] font-bold text-white hover:bg-white/20">
           <Languages className="h-3.5 w-3.5" />
@@ -609,10 +663,99 @@ export const InterpreterPortal: React.FC<InterpreterPortalProps> = ({
         </div>
       )}
 
-      {!pendingAssignment && !profile.activeSessionId && !showMissedCall && (
+      {!pendingAssignment && !profile.activeSessionId && !showMissedCall && waitingCalls.length === 0 && (
         <div className="rounded-2xl border border-white/15 bg-white/5 p-5">
           <p className="text-sm font-bold">Waiting for a request</p>
-          <p className="mt-1 text-xs text-white/70">An iPhone-style marimba ringtone plays here when a caller asks for you. Answer before the timer ends.</p>
+          <p className="mt-1 text-xs text-white/70">When a client starts a request, every free matching interpreter rings at once. Answer first to take the call.</p>
+        </div>
+      )}
+
+      {/* Live waiting calls — calls currently ringing with live countdown */}
+      {waitingCalls.length > 0 && !pendingAssignment && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-200">
+              Live calls ringing ({waitingCalls.length})
+            </p>
+          </div>
+          {waitingCalls.map((call) => {
+            const expiresAt = call.assignmentExpiresAt ? new Date(call.assignmentExpiresAt).getTime() : 0;
+            const secondsLeft = expiresAt ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)) : 0;
+            if (!call.queued && secondsLeft === 0) return null;
+            const urgent = secondsLeft <= 10;
+            return (
+              <div
+                key={call.reference}
+                className={`rounded-2xl border p-4 space-y-3 ${
+                  urgent
+                    ? 'border-red-400/50 bg-red-950/30'
+                    : 'border-amber-300/30 bg-amber-500/10'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono text-white/70">{call.reference}</span>
+                  {call.urgency === 'emergency' && (
+                    <span className="text-[9px] bg-red-500 text-white px-2 py-0.5 rounded-full font-black uppercase">
+                      Emergency
+                    </span>
+                  )}
+                </div>
+
+                {/* Big countdown */}
+                <div className="text-center py-1">
+                  <p className={`text-5xl font-black tabular-nums ${urgent ? 'text-red-300 animate-pulse' : 'text-amber-200'}`}>
+                    {secondsLeft}
+                  </p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mt-1">
+                    seconds to answer
+                  </p>
+                </div>
+
+                {/* Countdown bar */}
+                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-1000 ${urgent ? 'bg-red-400' : 'bg-amber-400'}`}
+                    style={{ width: `${Math.min(100, (secondsLeft / 60) * 100)}%` }}
+                  />
+                </div>
+
+                <div className="text-xs text-white/70 space-y-0.5">
+                  <div className="font-semibold text-white">
+                    {languages.find(l => l.code === call.sourceLanguage)?.name || call.sourceLanguage?.toUpperCase()}{' '}
+                    → {languages.find(l => l.code === call.targetLanguage)?.name || call.targetLanguage?.toUpperCase()}
+                  </div>
+                  <div>{call.serviceCategory.replace(/_/g, ' ')} · {call.requesterName}</div>
+                </div>
+
+                {onTakeWaitingCall && (
+                  <button
+                    type="button"
+                    disabled={takingWaitingCall === call.reference}
+                    onClick={async () => {
+                      setTakingWaitingCall(call.reference);
+                      try {
+                        await onTakeWaitingCall(call.reference);
+                      } catch (e: any) {
+                        alert(e?.message || 'Could not take call');
+                      } finally {
+                        setTakingWaitingCall(null);
+                      }
+                    }}
+                    className={`w-full h-11 rounded-xl text-white text-xs font-bold cursor-pointer flex items-center justify-center gap-2 transition-all ${
+                      urgent
+                        ? 'bg-red-600 hover:bg-red-500'
+                        : 'bg-blue-600 hover:bg-blue-500'
+                    } disabled:opacity-50`}
+                  >
+                    {takingWaitingCall === call.reference ? 'Connecting...' : (
+                      <><PhoneCall className="w-4 h-4" /> Take This Call</>
+                    )}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       </section>
@@ -676,7 +819,7 @@ function DetailPage({ title, onBack, children }: { title: string; onBack: () => 
 function InterpreterShell({ children }: { children: React.ReactNode }) {
   const panels = React.Children.toArray(children).filter(React.isValidElement);
   return (
-    <div className="relative h-[calc(100vh-140px)] w-full overflow-hidden">
+    <div className="relative h-[calc(100vh-140px)] w-full overflow-hidden rounded-[2rem] border border-slate-800/40 shadow-[0_20px_70px_rgba(15,23,42,0.28)]">
       <img
         src="/src/assets/images/triage_clinical_station_hero_1793945653740.jpg"
         alt=""

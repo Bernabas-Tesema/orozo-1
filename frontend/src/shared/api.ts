@@ -12,7 +12,8 @@ import {
   ServiceCategory,
   UrgencyLevel,
   CommunicationMode,
-  ScheduleType
+  ScheduleType,
+  Meeting
 } from './types';
 
 const BASE_URL = '/api/v1';
@@ -249,6 +250,7 @@ export const api = {
     identity: string;
     communicationMode: string;
     hasSecret: boolean;
+    session?: InterpretationSession;
   }> {
     return request(`/sessions/${sessionId}/livekit-token`, {
       method: 'POST',
@@ -318,15 +320,26 @@ export const api = {
   }> {
     return request('/supervisor/queue');
   },
-  async supervisorAssign(requestReference: string, interpreterId: string, reason?: string): Promise<{
+  async supervisorAssign(requestReference: string, interpreterId?: string, reason?: string): Promise<{
     success: boolean;
     message: string;
     request: InterpretationRequest;
-    session: InterpretationSession;
+    dispatch?: any;
   }> {
-    return request('/supervisor/assign', {
+    return request('/supervisor/ring', {
       method: 'POST',
       body: JSON.stringify({ requestReference, interpreterId, reason }),
+    });
+  },
+  async supervisorRing(requestReference: string): Promise<{
+    success: boolean;
+    message: string;
+    request: InterpretationRequest;
+    dispatch?: any;
+  }> {
+    return request('/supervisor/ring', {
+      method: 'POST',
+      body: JSON.stringify({ requestReference }),
     });
   },
   async supervisorResolveUnknown(requestReference: string, identifiedLanguageCode: string, coordinatorNotes?: string): Promise<{
@@ -495,5 +508,54 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(params),
     });
+  },
+
+  // Waiting calls queue
+  async getWaitingCalls(): Promise<{ waitingCalls: InterpretationRequest[] }> {
+    return request('/waiting-calls');
+  },
+  async takeWaitingCall(reference: string): Promise<{
+    success: boolean;
+    session: InterpretationSession;
+    assignment: Assignment;
+    message: string;
+  }> {
+    return request(`/waiting-calls/${reference}/take`, { method: 'POST' });
+  },
+
+  // Staff listing
+  async getStaff(): Promise<{ staff: User[] }> {
+    return request('/staff');
+  },
+
+  // Group meetings
+  async getMeetings(): Promise<{ meetings: Meeting[] }> {
+    return request('/meetings');
+  },
+  async createMeeting(data: {
+    title: string;
+    communicationMode: string;
+    participantIds: string[];
+  }): Promise<{ meeting: Meeting }> {
+    return request('/meetings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async getMeetingDetail(meetingId: string): Promise<{ meeting: Meeting }> {
+    return request(`/meetings/${meetingId}`);
+  },
+  async joinMeeting(meetingId: string): Promise<{
+    token: string;
+    url: string;
+    room: string;
+    identity: string;
+    communicationMode: string;
+    meeting: Meeting;
+  }> {
+    return request(`/meetings/${meetingId}/join`, { method: 'POST' });
+  },
+  async endMeeting(meetingId: string): Promise<{ success: boolean; message: string }> {
+    return request(`/meetings/${meetingId}/end`, { method: 'POST' });
   },
 };

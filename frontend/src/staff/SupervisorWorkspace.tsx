@@ -36,7 +36,7 @@ interface SupervisorWorkspaceProps {
   completions: CompletionReport[];
   interpreters: InterpreterProfile[];
   languages: SupportedLanguage[];
-  onManualAssign: (requestReference: string, interpreterId: string, reason?: string) => Promise<void>;
+  onManualAssign: (requestReference: string, interpreterId?: string, reason?: string) => Promise<void>;
   onResolveUnknownLanguage: (requestReference: string, languageCode: string, notes?: string) => Promise<void>;
   onResolveIssue: (completionId: string, resolutionNote: string) => Promise<void>;
   onJoinSession: (sessionId: string) => void;
@@ -71,11 +71,6 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const [resolvingReq, setResolvingReq] = useState<InterpretationRequest | null>(null);
   const [selectedLanguageCode, setSelectedLanguageCode] = useState('orm');
   const [coordinatorAssessment, setCoordinatorAssessment] = useState('');
-
-  // Manual assign modal
-  const [manualAssignReq, setManualAssignReq] = useState<InterpretationRequest | null>(null);
-  const [selectedInterpreterId, setSelectedInterpreterId] = useState('');
-  const [overrideReason, setOverrideReason] = useState('Immediate emergency clinical triage dispatch');
 
   // Flagged issue resolution modal
   const [resolvingCompletion, setResolvingCompletion] = useState<CompletionReport | null>(null);
@@ -137,14 +132,11 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     }
   };
 
-  const handleConfirmManualAssign = async () => {
-    if (!manualAssignReq || !selectedInterpreterId) return;
+  const handleRingInterpreters = async (reference: string) => {
     try {
-      await onManualAssign(manualAssignReq.reference, selectedInterpreterId, overrideReason);
-      setManualAssignReq(null);
-      setSelectedInterpreterId('');
+      await onManualAssign(reference);
     } catch (err: any) {
-      alert(`Error assigning interpreter: ${err.message}`);
+      alert(`Error ringing interpreters: ${err.message}`);
     }
   };
 
@@ -184,7 +176,11 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
       setDeskName('');
       setDeskEmail('');
       setDeskPassword('');
-      await onAccountsCreated?.();
+      try {
+        await onAccountsCreated?.();
+      } catch {
+        // Account was created; refresh failures should not look like create failures.
+      }
     } catch (err: unknown) {
       setOrgError(err instanceof Error ? err.message : 'Could not open the organization');
     } finally {
@@ -213,7 +209,11 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         languages: 'amh, eng',
         categories: 'healthcare',
       });
-      await onAccountsCreated?.();
+      try {
+        await onAccountsCreated?.();
+      } catch {
+        // Account was created; refresh failures should not look like create failures.
+      }
     } catch (err: unknown) {
       setInterpreterFormError(err instanceof Error ? err.message : 'Could not add interpreter');
     } finally {
@@ -242,7 +242,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             </div>
             <h1 className="text-2xl font-black mt-1">Supervisor & Dispatch Hub</h1>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-              Monitor active queues, resolve unknown dialect requests, and manage manual dispatch.
+              Monitor live rings and sessions. Calls go directly to available interpreters — no manual assignment step.
             </p>
           </div>
         </div>
@@ -278,7 +278,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
               <AlertTriangle className="w-4 h-4" />
             </div>
             <div className="text-2xl font-black text-white">{delayedOrUnmatchedList.length}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Manual assignment</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Waiting / re-ring</div>
           </button>
 
           <button
@@ -489,14 +489,11 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
 
                     <div className="flex items-center space-x-2 shrink-0">
                       <button
-                        onClick={() => {
-                          setManualAssignReq(req);
-                          setSelectedInterpreterId(interpreters[0]?.id || '');
-                        }}
+                        onClick={() => handleRingInterpreters(req.reference)}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-xs flex items-center space-x-1.5 cursor-pointer"
                       >
                         <Users className="w-4 h-4" />
-                        <span>Assign Interpreter</span>
+                        <span>Ring interpreters</span>
                       </button>
                     </div>
                   </div>
@@ -696,88 +693,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
                 onClick={handleConfirmResolveUnknown}
                 className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
               >
-                Confirm & Dispatch
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: MANUAL ASSIGNMENT */}
-      {manualAssignReq && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200">
-            <h3 className="text-base font-extrabold text-gray-900">
-              Manual Dispatch Override
-            </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              Select accredited interpreter for request {manualAssignReq.reference} (
-              {manualAssignReq.sourceLanguage.toUpperCase()} ⇄ {manualAssignReq.targetLanguage.toUpperCase()}).
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Eligible Interpreters
-                </label>
-                <div className="max-h-48 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
-                  {[...interpreters].sort((a, b) => b.rating - a.rating).map((int) => (
-                    <label
-                      key={int.id}
-                      className={`p-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer ${
-                        selectedInterpreterId === int.id ? 'bg-blue-50 font-bold' : ''
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2 text-xs">
-                        <input
-                          type="radio"
-                          name="selectedInterpreter"
-                          value={int.id}
-                          checked={selectedInterpreterId === int.id}
-                          onChange={(e) => setSelectedInterpreterId(e.target.value)}
-                          className="text-blue-600"
-                        />
-                        <div>
-                          <div className="text-gray-900 font-bold">{int.fullName}</div>
-                          <div className="text-[11px] text-gray-500">
-                            {int.rating.toFixed(1)} stars · {int.availability}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-semibold bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                        {int.supportedLanguages.map((l) => l.languageCode.toUpperCase()).join('/')}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  Override Reason
-                </label>
-                <input
-                  type="text"
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-end space-x-2 border-t pt-3">
-              <button
-                onClick={() => setManualAssignReq(null)}
-                className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmManualAssign}
-                disabled={!selectedInterpreterId}
-                className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
-              >
-                Confirm Assignment
+                Confirm & ring interpreters
               </button>
             </div>
           </div>

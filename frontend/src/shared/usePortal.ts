@@ -10,6 +10,7 @@ import type {
   InterpretationSession,
   InterpreterProfile,
   IssueCode,
+  Meeting,
   PlatformNotification,
   PlatformSettings,
   ScheduleType,
@@ -60,13 +61,15 @@ export function usePortal() {
         return;
       }
 
+      // Keep the signed-in shell up even if one secondary endpoint fails
+      // (e.g. assignments historically 500'd and blanked the whole app).
       const [langsRes, interpsRes, reqsRes, asgRes, notifsRes, settingsRes] = await Promise.all([
-        api.getLanguages(),
-        api.getInterpreters(),
-        api.getRequests(),
-        api.getAssignments(),
-        api.getNotifications(),
-        api.getPlatformSettings(),
+        api.getLanguages().catch(() => ({ languages: [] as SupportedLanguage[] })),
+        api.getInterpreters().catch(() => ({ interpreters: [] as InterpreterProfile[] })),
+        api.getRequests().catch(() => ({ requests: [] as InterpretationRequest[] })),
+        api.getAssignments().catch(() => ({ assignments: [] as Assignment[] })),
+        api.getNotifications().catch(() => ({ notifications: [] as PlatformNotification[] })),
+        api.getPlatformSettings().catch(() => ({ settings: null as PlatformSettings | null })),
       ]);
 
       setCurrentUser(meRes.user);
@@ -76,7 +79,27 @@ export function usePortal() {
       setRequests(reqsRes.requests);
       setAssignments(asgRes.assignments);
       setNotifications(notifsRes.notifications);
-      setSettings(settingsRes.settings);
+      if (settingsRes.settings) setSettings(settingsRes.settings);
+
+      // Load live sessions for client/interpreter so the call room has real session metadata
+      // (shared callRoom = orzo-<requestReference>, like Eliotel's gcall-<classId>).
+      if (meRes.user?.role === 'client' || meRes.user?.role === 'interpreter') {
+        const liveIds = Array.from(
+          new Set(
+            reqsRes.requests
+              .map((request) => request.activeSessionId)
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+        if (liveIds.length) {
+          const loaded = await Promise.all(
+            liveIds.map((id) => api.getSession(id).then((res) => res.session).catch(() => null))
+          );
+          setSessions(loaded.filter((row): row is NonNullable<typeof row> => Boolean(row)));
+        } else {
+          setSessions([]);
+        }
+      }
 
       if (meRes.user?.role === 'supervisor' || meRes.user?.role === 'platform_admin') {
         const queueRes = await api.getSupervisorQueue().catch(() => null);
@@ -90,6 +113,11 @@ export function usePortal() {
         const auditRes = await api.getAuditLogs().catch(() => null);
         if (auditRes) setAuditLogs(auditRes.auditLogs);
       }
+
+      // Load meetings for platform_admin only (staff get invited — no need for all to poll heavily)
+      if (meRes.user?.role === 'platform_admin') {
+        api.getMeetings().then((res) => setMeetings(res.meetings || [])).catch(() => {});
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load platform data';
       console.error('Error fetching data:', err);
@@ -101,26 +129,88 @@ export function usePortal() {
 
   useEffect(() => {
     refreshData();
-    const milliseconds = currentUser?.role === 'interpreter' || currentUser?.role === 'client' ? 3000 : 15000;
+    // Interpreters need a fast poll so simultaneous rings show up immediately.
+    const milliseconds =
+      currentUser?.role === 'interpreter' ? 1200 : currentUser?.role === 'client' ? 2500 : 15000;
     const timer = setInterval(refreshData, milliseconds);
     return () => clearInterval(timer);
   }, [refreshData, currentUser?.role]);
 
+  // Extra lightweight pending-assignment poll for interpreters (incoming ring).
+  useEffect(() => {
+    if (currentUser?.role !== 'interpreter') return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const asgRes = await api.getAssignments();
+        if (stopped) return;
+        const pending = asgRes.assignments.filter((item) => item.outcome === 'pending');
+        if (!pending.length) return;
+        setAssignments((prev) => {
+          const others = prev.filter((item) => item.outcome !== 'pending');
+          const byId = new Map<string, Assignment>();
+          [...others, ...asgRes.assignments].forEach((item) => byId.set(item.id, item));
+          return Array.from(byId.values()).sort(
+            (a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime(),
+          );
+        });
+      } catch {
+        // ignore transient poll errors
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [currentUser?.role]);
+
+  // Poll for new meeting invitations (staff only, platform_admin hosted)
+  useEffect(() => {
+    if (!currentUser || !['supervisor', 'interpreter', 'platform_admin'].includes(currentUser.role)) return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res = await api.getMeetings();
+        if (stopped) return;
+        const newMeetings = res.meetings || [];
+        setMeetings((prev) => {
+          const prevById = new Map(prev.map((m) => [m.id, m]));
+          for (const m of newMeetings) {
+            if (
+              m.status === 'active' &&
+              !prevById.has(m.id) &&
+              m.participants.some(
+                (p: { accountId: string; status: string }) =>
+                  p.accountId === currentUser.id && p.status === 'invited',
+              )
+            ) {
+              // Show an invitation notification instead of auto-opening the room.
+              // The user must click "Join" in the pending invitation UI.
+              setPendingMeetingInviteId(m.id);
+            }
+          }
+          return newMeetings;
+        });
+      } catch {
+        // ignore — meeting table may not exist yet
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [currentUser?.role, currentUser?.id]);
+
   const supportOpened = useRef(new Set<string>());
-  const joinedSessions = useRef(new Set<string>());
   const knownCompleted = useRef(new Set<string>());
   const completionReadyFor = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!currentUser || currentUser.role !== 'client') return;
-    for (const request of requests) {
-      if (request.requesterId !== currentUser.id) continue;
-      if (request.status === 'in_session' && request.activeSessionId && !joinedSessions.current.has(request.activeSessionId)) {
-        joinedSessions.current.add(request.activeSessionId);
-        setActiveSessionRoomId(request.activeSessionId);
-      }
-    }
-  }, [requests, currentUser]);
+  // Client must start from the intake form; do not auto-open the call room.
+  // Join is explicit via the Join button once an interpreter accepts.
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'client') return;
@@ -128,22 +218,33 @@ export function usePortal() {
       const now = Date.now();
       for (const request of requests) {
         if (feedbackModalSessionId) continue;
-        if (request.requesterId !== currentUser.id || request.status !== 'assigned') continue;
+        if (request.requesterId !== currentUser.id || !['matching', 'assigned'].includes(request.status)) continue;
         if (supportOpened.current.has(request.reference)) continue;
         const liveSession = sessions.find(
           (item) => item.id === request.activeSessionId || item.requestReference === request.reference,
         );
         if (liveSession && !['awaiting_acceptance', 'searching', 'created'].includes(liveSession.status)) continue;
-        const assignment = assignments.find(
+        const pendingForRequest = assignments.filter(
           (item) => item.requestReference === request.reference && item.outcome === 'pending',
         );
-        if (!assignment || new Date(assignment.expiresAt).getTime() > now) continue;
+        if (!pendingForRequest.length) continue;
+        // Wait until the whole simultaneous ring wave has timed out.
+        // Ignore bogus immediate-expiry from clock skew (need at least 5s since assign).
+        const stillLive = pendingForRequest.some((item) => {
+          const exp = new Date(item.expiresAt).getTime();
+          const assigned = new Date(item.assignedAt).getTime();
+          if (Number.isFinite(assigned) && now - assigned < 5000) return true;
+          return Number.isFinite(exp) && exp > now;
+        });
+        if (stillLive) continue;
         supportOpened.current.add(request.reference);
         setActiveSessionRoomId(null);
         setSupportVoice(false);
         setSupportExpanded(true);
         setIsOrzoSupportOpen(true);
-        api.expireAssignment(assignment.id).then(() => refreshData()).catch(() => undefined);
+        Promise.all(pendingForRequest.map((item) => api.expireAssignment(item.id).catch(() => undefined)))
+          .then(() => refreshData())
+          .catch(() => undefined);
       }
     }, 250);
     return () => window.clearInterval(timer);
@@ -254,13 +355,15 @@ export function usePortal() {
   }) => {
     const res = await api.createRequest(data);
     await refreshData();
-    const session = res.dispatch?.session;
-    if (session && (session.status === 'ready_to_join' || session.status === 'active')) {
-      setActiveSessionRoomId(session.id);
-      return session.id;
+    const dispatchStatus = String(res.dispatch?.status || '');
+    // Never auto-join the LiveKit room from create — desk waits while interpreters ring.
+    if (
+      dispatchStatus === 'ringing' ||
+      res.request.status === 'matching' ||
+      res.request.status === 'assigned'
+    ) {
+      return 'waiting';
     }
-    if (res.request.status === 'assigned') return 'ringing';
-    if (res.request.status === 'matching') return 'waiting';
     return undefined;
   };
 
@@ -284,8 +387,9 @@ export function usePortal() {
     if (response === 'accepted' && res.session?.id) setActiveSessionRoomId(res.session.id);
   };
 
-  const handleManualAssign = async (requestReference: string, interpreterId: string, reason?: string) => {
-    await api.supervisorAssign(requestReference, interpreterId, reason);
+  const handleManualAssign = async (requestReference: string, _interpreterId?: string, _reason?: string) => {
+    // Direct ring — no coordinator pick of a single interpreter.
+    await api.supervisorRing(requestReference);
     await refreshData();
   };
 
@@ -352,6 +456,59 @@ export function usePortal() {
     await refreshData();
   };
 
+  // ── Waiting calls ──
+  const handleTakeWaitingCall = async (reference: string) => {
+    const res = await api.takeWaitingCall(reference);
+    setSessions((prev) => {
+      const others = prev.filter((s) => s.id !== res.session.id);
+      return [res.session, ...others];
+    });
+    setActiveSessionRoomId(res.session.id);
+    await refreshData();
+  };
+
+  // ── Group meetings ──
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
+  // Pending invitation — set when a new active meeting arrives; cleared when user joins or dismisses.
+  const [pendingMeetingInviteId, setPendingMeetingInviteId] = useState<string | null>(null);
+
+  const refreshMeetings = useCallback(async () => {
+    try {
+      const res = await api.getMeetings();
+      setMeetings(res.meetings || []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleCreateMeeting = async (data: {
+    title: string;
+    communicationMode: string;
+    participantIds: string[];
+  }) => {
+    const res = await api.createMeeting(data);
+    setMeetings((prev) => [res.meeting, ...prev]);
+    setActiveMeetingId(res.meeting.id);
+    return res.meeting;
+  };
+
+  const handleJoinMeeting = (meetingId: string) => {
+    // Explicit user join — clear any pending invite and open the room.
+    setPendingMeetingInviteId(null);
+    setActiveMeetingId(meetingId);
+  };
+
+  const handleDismissMeetingInvite = () => {
+    setPendingMeetingInviteId(null);
+  };
+
+  const handleEndMeeting = async (meetingId: string) => {
+    await api.endMeeting(meetingId);
+    setActiveMeetingId(null);
+    setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+  };
+
   return {
     currentUser,
     interpreterProfile,
@@ -414,6 +571,16 @@ export function usePortal() {
     handleSubmitCompletion,
     handleSubmitFeedback,
     handleMarkNotificationRead,
+    handleTakeWaitingCall,
+    meetings,
+    activeMeetingId,
+    setActiveMeetingId,
+    refreshMeetings,
+    handleCreateMeeting,
+    handleJoinMeeting,
+    handleEndMeeting,
+    pendingMeetingInviteId,
+    handleDismissMeetingInvite,
   };
 }
 

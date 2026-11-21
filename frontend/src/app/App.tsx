@@ -4,6 +4,9 @@ import { CompletionReportModal } from '../shared/components/CompletionReportModa
 import { FeedbackModal } from '../shared/components/FeedbackModal';
 import { Header } from '../shared/components/Header';
 import { LiveSessionRoom } from '../shared/components/LiveSessionRoom';
+import { MeetingRoom } from '../shared/components/MeetingRoom';
+import { MeetingInviteToast } from '../shared/components/MeetingInviteToast';
+import { CreateMeetingModal } from '../shared/components/CreateMeetingModal';
 import { ChangePasswordPage } from '../shared/components/ChangePasswordPage';
 import { LandingPage } from '../shared/components/LandingPage';
 import { LoginPage } from '../shared/components/LoginPage';
@@ -16,6 +19,7 @@ import { useState } from 'react';
 import { usePortal } from '../shared/usePortal';
 import { InvitePasswordPage } from '../shared/components/InvitePasswordPage';
 import { workplaceOf } from '../shared/workplace';
+import { resolveCallRoom } from '../shared/callRoom';
 
 function inviteEmailFromLocation() {
   const params = new URLSearchParams(window.location.search);
@@ -27,6 +31,7 @@ export default function App() {
   const portal = usePortal();
   const { currentUser, settings, loading, error } = portal;
   const [inviteEmail, setInviteEmail] = useState<string | null>(inviteEmailFromLocation);
+  const [showCreateMeeting, setShowCreateMeeting] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
   const activeSessionForUser = (() => {
@@ -46,28 +51,31 @@ export default function App() {
   );
 
   const currentLiveSession = portal.activeSessionRoomId
-    ? portal.sessions.find((session) => session.id === portal.activeSessionRoomId) || {
-        id: portal.activeSessionRoomId,
-        requestReference: matchingRequest?.reference || 'REQ-LIVE',
-        sessionToken: 'SES-LIVE-TOKEN',
-        status: 'active' as const,
-        communicationMode: (matchingRequest?.modality || 'video') as CommunicationMode,
-        lowBandwidthMode: settings?.telecomLowBandwidthPreset || true,
-        recordingEnabled: false,
-        durationSeconds: 0,
-        clientId: currentUser?.id || 'usr-client',
-        clientName: currentUser?.fullName || 'Client',
-        interpreterName:
-          matchingRequest?.assignedInterpreterName ||
-          portal.interpreterProfile?.fullName ||
-          'Chaltu Kebede (Certified)',
-        organizationName: currentUser?.organizationName || 'Tikur Anbessa Specialized Hospital',
-        sourceLanguage: matchingRequest?.sourceLanguage || 'orm',
-        targetLanguage: matchingRequest?.targetLanguage || 'amh',
-        serviceCategory: (matchingRequest?.serviceCategory || 'healthcare') as ServiceCategory,
-        connectionHealth: 'optimal' as const,
-        authorizedParticipantIds: [currentUser?.id || ''],
-      }
+    ? portal.sessions.find((session) => session.id === portal.activeSessionRoomId) || (() => {
+        const fallback = {
+          id: portal.activeSessionRoomId,
+          requestReference: matchingRequest?.reference || 'REQ-LIVE',
+          sessionToken: 'SES-LIVE-TOKEN',
+          status: 'active' as const,
+          communicationMode: (matchingRequest?.modality || 'video') as CommunicationMode,
+          lowBandwidthMode: settings?.telecomLowBandwidthPreset || true,
+          recordingEnabled: false,
+          durationSeconds: 0,
+          clientId: currentUser?.id || 'usr-client',
+          clientName: currentUser?.fullName || 'Client',
+          interpreterName:
+            matchingRequest?.assignedInterpreterName ||
+            portal.interpreterProfile?.fullName ||
+            'Chaltu Kebede (Certified)',
+          organizationName: currentUser?.organizationName || 'Tikur Anbessa Specialized Hospital',
+          sourceLanguage: matchingRequest?.sourceLanguage || 'orm',
+          targetLanguage: matchingRequest?.targetLanguage || 'amh',
+          serviceCategory: (matchingRequest?.serviceCategory || 'healthcare') as ServiceCategory,
+          connectionHealth: 'optimal' as const,
+          authorizedParticipantIds: [currentUser?.id || ''],
+        };
+        return { ...fallback, callRoom: resolveCallRoom(fallback) };
+      })()
     : null;
 
   if (loading && !currentUser && sessionStorage.getItem('orzo-web-session') === '1') {
@@ -174,7 +182,7 @@ export default function App() {
         </main>
       )}
 
-      {isStaff(currentUser) && <StaffWorkspace portal={portal} />}
+      {isStaff(currentUser) && <StaffWorkspace portal={portal} onOpenCreateMeeting={currentUser.role === 'platform_admin' ? () => setShowCreateMeeting(true) : undefined} />}
 
       <footer className="bg-white border-t border-gray-200 mt-auto py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-2">
@@ -203,6 +211,7 @@ export default function App() {
             portal.setActiveSessionRoomId(null);
             portal.setCompletionModalSessionId(sessionId);
           }}
+          onTakeWaitingCall={portal.handleTakeWaitingCall}
         />
       )}
 
@@ -251,6 +260,49 @@ export default function App() {
         onClose={portal.closeSupport}
         onSelectLanguageForRequest={(langCode) => portal.setPreselectedSourceLanguage(langCode)}
       />
+
+      {/* Meeting invitation toast — staff must click to join (no auto-open) */}
+      {portal.pendingMeetingInviteId && !portal.activeMeetingId && (() => {
+        const invite = portal.meetings.find((m) => m.id === portal.pendingMeetingInviteId);
+        if (!invite || !currentUser) return null;
+        const host = invite.participants.find((p) => p.role === 'host');
+        return (
+          <MeetingInviteToast
+            meeting={invite}
+            hostName={host?.accountName || invite.creatorName}
+            onJoin={() => portal.handleJoinMeeting(invite.id)}
+            onDismiss={portal.handleDismissMeetingInvite}
+          />
+        );
+      })()}
+
+      {/* Active Meeting Room overlay */}
+      {portal.activeMeetingId && (() => {
+        const activeMeeting = portal.meetings.find((m) => m.id === portal.activeMeetingId);
+        if (!activeMeeting || !currentUser) return null;
+        return (
+          <MeetingRoom
+            meeting={activeMeeting}
+            currentUser={currentUser}
+            onEnd={portal.handleEndMeeting}
+            onClose={() => portal.setActiveMeetingId(null)}
+          />
+        );
+      })()}
+
+      {/* Create Meeting Modal (platform_admin only) */}
+      {currentUser?.role === 'platform_admin' && (
+        <CreateMeetingModal
+          currentUser={currentUser}
+          isOpen={showCreateMeeting}
+          onClose={() => setShowCreateMeeting(false)}
+          onCreate={async (data) => {
+            const meeting = await portal.handleCreateMeeting(data);
+            setShowCreateMeeting(false);
+            return meeting;
+          }}
+        />
+      )}
     </div>
   );
 }

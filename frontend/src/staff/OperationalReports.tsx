@@ -9,14 +9,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   Globe,
-  PieChart,
   Users,
   Building
 } from 'lucide-react';
 
-export const OperationalReports: React.FC = () => {
+export const OperationalReports: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<HistoryRange>('month');
 
   useEffect(() => {
@@ -25,17 +25,20 @@ export const OperationalReports: React.FC = () => {
 
   const loadReports = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.getReports(dateRange);
       setData(res);
     } catch (err) {
       console.error(err);
+      setData(null);
+      setError(err instanceof Error ? err.message : 'Could not load operational statistics');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="bg-white p-12 rounded-xl border border-gray-200 text-center">
         <Clock className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-2" />
@@ -44,11 +47,30 @@ export const OperationalReports: React.FC = () => {
     );
   }
 
-  const { summary, languageDemand, categoryDemand } = data;
+  if (error || !data) {
+    return (
+      <div className="bg-white p-12 rounded-xl border border-amber-200 text-center space-y-3">
+        <AlertTriangle className="w-8 h-8 text-amber-600 mx-auto" />
+        <p className="text-sm text-gray-700">{error || 'No operational statistics available yet.'}</p>
+        <button
+          type="button"
+          onClick={loadReports}
+          className="text-xs font-semibold text-emerald-700 underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const summary = data.summary || {};
+  const languageDemand = data.languageDemand || {};
+  const categoryDemand = data.categoryDemand || {};
 
   return (
     <div className="space-y-6">
       {/* Header */}
+      {!compact && (
       <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 rounded-3xl border border-white/10 p-6 sm:p-8 shadow-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
@@ -64,19 +86,20 @@ export const OperationalReports: React.FC = () => {
 
         <HistoryRangeControl value={dateRange} onChange={setDateRange} />
       </div>
+      )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 gap-3 ${compact ? '' : 'lg:grid-cols-4'}`}>
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between text-gray-500 text-xs font-semibold">
             <span>Total Requests</span>
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-black text-gray-900 mt-2">
-            {summary.totalRequests}
+            {summary.totalRequests ?? 0}
           </div>
           <div className="text-[11px] text-emerald-700 mt-1 font-medium">
-            {summary.completedRequests} completed · {summary.unmatchedRequests} still open
+            {summary.completedRequests ?? 0} completed · {summary.unmatchedRequests ?? 0} still open
           </div>
         </div>
 
@@ -86,7 +109,7 @@ export const OperationalReports: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-2xl font-black text-blue-900 mt-2">
-            {summary.completionRatePercent}%
+            {summary.completionRatePercent ?? 0}%
           </div>
           <div className="text-[11px] text-blue-700 mt-1 font-medium">
             Completed calls divided by requests in this range
@@ -112,16 +135,16 @@ export const OperationalReports: React.FC = () => {
             <Users className="w-4 h-4 text-purple-600" />
           </div>
           <div className="text-2xl font-black text-purple-900 mt-2">
-            {summary.availableInterpreters + summary.busyInterpreters}
+            {(summary.availableInterpreters ?? 0) + (summary.busyInterpreters ?? 0)}
           </div>
           <div className="text-[11px] text-purple-700 mt-1 font-medium">
-            {summary.availableInterpreters} available · {summary.busyInterpreters} on a call · {summary.offlineInterpreters} offline
+            {summary.availableInterpreters ?? 0} available · {summary.busyInterpreters ?? 0} on a call · {summary.offlineInterpreters ?? 0} offline
           </div>
         </div>
       </div>
 
       {/* Breakdowns: Language Demand & Sector Distribution */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {!compact && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Language Demand */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
           <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
@@ -132,7 +155,7 @@ export const OperationalReports: React.FC = () => {
             {Object.entries(languageDemand).map(([lang, row]: [string, any]) => {
               const count = typeof row === 'number' ? row : row.count;
               const label = typeof row === 'number' ? lang : row.name;
-              const percentage = Math.round((count / summary.totalRequests) * 100) || 0;
+              const percentage = Math.round((count / Math.max(summary.totalRequests || 1, 1)) * 100) || 0;
               return (
                 <div key={lang}>
                   <div className="flex items-center justify-between text-xs mb-1">
@@ -165,7 +188,7 @@ export const OperationalReports: React.FC = () => {
           </h3>
           <div className="space-y-3">
             {Object.entries(categoryDemand).map(([cat, count]: [string, any]) => {
-              const percentage = Math.round((count / summary.totalRequests) * 100) || 0;
+              const percentage = Math.round((count / Math.max(summary.totalRequests || 1, 1)) * 100) || 0;
               return (
                 <div key={cat}>
                   <div className="flex items-center justify-between text-xs mb-1">
@@ -187,7 +210,7 @@ export const OperationalReports: React.FC = () => {
             })}
           </div>
         </div>
-      </div>
+      </div>}
 
     </div>
   );

@@ -82,12 +82,9 @@ class LiveKitTokenBuilder:
         now = int(time.time())
         exp = now + self.ttl_seconds
 
-        # Video grant specification per LiveKit architecture
-        can_publish_video = communication_mode == "video"
-        sources = ["microphone"]
-        if can_publish_video:
-            sources.append("camera")
-            sources.append("screen_share")
+        # Always allow camera and screen_share so participants can turn on
+        # their camera mid-call even if the call started as audio-only.
+        sources = ["microphone", "camera", "screen_share"]
 
         video_grant = {
             "room": room_name,
@@ -96,9 +93,9 @@ class LiveKitTokenBuilder:
             "canSubscribe": True,
             "canPublishData": True,
             "canPublishSources": sources,
-            # Ordinary participants do NOT receive admin/room control grants
+            # First joiner may need create so the shared orzo-<request> room exists.
             "roomAdmin": False,
-            "roomCreate": False,
+            "roomCreate": True,
             "roomList": False,
             "roomRecord": False,
         }

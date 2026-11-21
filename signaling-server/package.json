@@ -1,0 +1,17 @@
+{
+  "name": "orzo-signaling-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "In-memory WebSocket signaling relay for ORZO interpretation WebRTC rooms",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

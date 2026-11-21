@@ -9,9 +9,11 @@ import {
 } from '../shared/types';
 import { HistoryRange, inHistoryRange } from '../shared/historyRange';
 import { HistoryRangeControl } from '../shared/components/HistoryRangeControl';
+import { OperationalReports } from './OperationalReports';
 import {
   Building2,
   ShieldCheck,
+  BarChart3,
   Languages,
   Sliders,
   FileCheck2,
@@ -25,7 +27,11 @@ import {
   Save,
   Radio,
   Server,
-  Ban
+  Ban,
+  LayoutDashboard,
+  ChevronDown,
+  UserPlus,
+  Users
 } from 'lucide-react';
 
 interface PlatformAdminPortalProps {
@@ -39,6 +45,7 @@ interface PlatformAdminPortalProps {
   onVerifyInterpreter: (id: string, status: string, note?: string) => Promise<void>;
   onUpdateSettings: (settings: Partial<PlatformSettings>) => Promise<void>;
   onAccountsCreated?: () => Promise<void> | void;
+  onOpenOperationalReports?: () => void;
 }
 
 export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
@@ -52,8 +59,10 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   onVerifyInterpreter,
   onUpdateSettings,
   onAccountsCreated,
+  onOpenOperationalReports,
 }) => {
-  const [activeTab, setActiveTab] = useState<'languages' | 'verification' | 'settings' | 'audit' | 'organizations'>('organizations');
+  const [activeTab, setActiveTab] = useState<'languages' | 'verification' | 'settings' | 'audit' | 'organizations' | 'interpreters' | 'supervisors'>('organizations');
+  const [systemAdminOpen, setSystemAdminOpen] = useState(true);
   const [orgName, setOrgName] = useState('');
   const [orgWorkplace, setOrgWorkplace] = useState('healthcare');
   const [workplaceTouched, setWorkplaceTouched] = useState(false);
@@ -114,7 +123,7 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   };
 
   useEffect(() => {
-    if (activeTab !== 'organizations') return;
+    if (!['organizations', 'interpreters', 'supervisors'].includes(activeTab)) return;
     loadRegistry().catch((err: Error) => setOrgError(err.message));
   }, [activeTab]);
 
@@ -144,8 +153,12 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
       setDeskName('');
       setDeskEmail('');
       setDeskPassword('');
-      await loadRegistry();
-      await onAccountsCreated?.();
+      try {
+        await loadRegistry();
+        await onAccountsCreated?.();
+      } catch {
+        // Account was created; refresh failures should not look like create failures.
+      }
     } catch (err: any) {
       setOrgError(err.message);
     } finally {
@@ -170,8 +183,12 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
       setSupervisorEmail('');
       setSupervisorPassword('');
       setSupervisorPhone('');
-      await loadRegistry();
-      await onAccountsCreated?.();
+      try {
+        await loadRegistry();
+        await onAccountsCreated?.();
+      } catch {
+        // Account was created; refresh failures should not look like create failures.
+      }
     } catch (err: any) {
       setOrgError(err.message);
     } finally {
@@ -200,7 +217,12 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
       setIntPhone('');
       setIntExtension('');
       setIntPassword('');
-      await loadRegistry();
+      try {
+        await loadRegistry();
+        await onAccountsCreated?.();
+      } catch {
+        // Account was created; refresh failures should not look like create failures.
+      }
     } catch (err: any) {
       setOrgError(err.message);
     } finally {
@@ -281,95 +303,149 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Top Admin Header */}
-      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-white/10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="min-h-[calc(100vh-190px)] overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm flex">
+      <aside className="hidden w-60 shrink-0 flex-col bg-[#17213a] text-slate-100 md:flex">
+        <div className="flex h-20 items-center gap-3 px-5 border-b border-white/10">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-950/30">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-5 h-5 text-purple-400" />
-              <span className="text-xs font-semibold text-purple-300 uppercase tracking-wider">
-                System Governance & Registry
-              </span>
-            </div>
-            <h1 className="text-2xl font-black mt-1">Platform Administration & Audit</h1>
-            <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-              Control the national language catalog, verify interpreter certifications, manage telecom resilience presets, and inspect immutable security audit trails.
-            </p>
-          </div>
-          <div className="text-right">
-            <span className="text-xs bg-purple-950/70 border border-purple-800 text-purple-300 px-3 py-1.5 rounded-lg">
-              Admin: <strong>{currentUser.fullName}</strong>
-            </span>
+            <p className="text-sm font-black tracking-tight">ORZO Admin</p>
+            <p className="text-[10px] text-slate-400">Platform management</p>
           </div>
         </div>
-
-        {/* Tab switcher */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-slate-800">
+        <nav className="flex-1 space-y-1 p-3">
           <button
+            type="button"
             onClick={() => setActiveTab('organizations')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+            className={`mb-2 w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold cursor-pointer ${
               activeTab === 'organizations'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
             }`}
           >
-            <Building2 className="w-4 h-4" />
-            <span>Organizations</span>
+            <LayoutDashboard className="h-4 w-4" />
+            <span>Dashboard</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('languages')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'languages'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
+            type="button"
+            onClick={() => setSystemAdminOpen((open) => !open)}
+            className="mb-1 w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-white/10 cursor-pointer"
           >
-            <Languages className="w-4 h-4" />
-            <span>Supported Languages ({languages.length})</span>
+            <span className="flex items-center gap-3">
+              <ShieldCheck className="h-4 w-4" />
+              System Administration
+            </span>
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${systemAdminOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          <button
-            onClick={() => setActiveTab('verification')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'verification'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <FileCheck2 className="w-4 h-4" />
-            <span>Interpreter Accreditation Registry ({interpreters.length})</span>
-          </button>
+          {systemAdminOpen && (
+            <div className="mb-2 ml-3 space-y-1 border-l border-white/10 pl-3">
+              {([
+                ['organizations', 'Organizations', Building2],
+                ['interpreters', 'Interpreters', UserPlus],
+                ['supervisors', 'Supervisors', Users],
+              ] as const).map(([tab, label, Icon]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[11px] font-bold cursor-pointer ${
+                    activeTab === tab
+                      ? 'bg-white/15 text-white'
+                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'settings'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Platform Configuration</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-              activeTab === 'audit'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Lock className="w-4 h-4" />
-            <span>Security Audit Logs ({auditLogs.length})</span>
-          </button>
+          {([
+            ['languages', 'Languages', Languages],
+            ['verification', 'Accreditation', FileCheck2],
+            ['settings', 'Configuration', Sliders],
+            ['audit', 'Audit Logs', Lock],
+          ] as const).map(([tab, label, Icon]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold cursor-pointer ${
+                activeTab === tab
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+            </button>
+          ))}
+          {onOpenOperationalReports && (
+            <button
+              type="button"
+              onClick={onOpenOperationalReports}
+              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>Operational statistics</span>
+            </button>
+          )}
+        </nav>
+        <div className="border-t border-white/10 p-4">
+          <p className="text-[10px] text-slate-400">Signed in as</p>
+          <p className="mt-1 truncate text-xs font-bold text-white">{currentUser.fullName}</p>
         </div>
-      </div>
+      </aside>
+
+      <main className="min-w-0 flex-1 overflow-auto bg-slate-50/70 p-4 sm:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">System Governance</p>
+            <h1 className="mt-1 text-xl font-black text-slate-900 sm:text-2xl">Platform Administration</h1>
+          </div>
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 md:hidden"
+            aria-label="Admin section"
+          >
+            <option value="organizations">Dashboard</option>
+            <option value="interpreters">Interpreters</option>
+            <option value="supervisors">Supervisors</option>
+            <option value="languages">Languages</option>
+            <option value="verification">Accreditation</option>
+            <option value="settings">Configuration</option>
+            <option value="audit">Audit Logs</option>
+          </select>
+          <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 sm:flex">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <span className="font-bold">Secure admin session</span>
+          </div>
+        </div>
 
       {activeTab === 'organizations' && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">Live overview</p>
+                <h2 className="mt-1 text-base font-black text-slate-900">Operational statistics</h2>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenOperationalReports}
+                className="text-xs font-bold text-blue-700 hover:text-blue-900"
+              >
+                View full reports
+              </button>
+            </div>
+            <OperationalReports compact />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
           <form onSubmit={registerOrganization} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-3">
             <h3 className="text-sm font-bold text-gray-900">Open an organization</h3>
             <p className="text-xs text-gray-500">Each organization gets an admin account and a triage desk. Both sign-in details are emailed to the organization admin and are not shown here again.</p>
@@ -437,43 +513,81 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
             </div>
           </div>
 
-          <form onSubmit={registerSupervisor} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-3">
-            <h3 className="text-sm font-bold text-gray-900">Create a supervisor</h3>
-            <p className="text-xs text-gray-500">A supervisor can open organizations and add interpreters. The temporary password is replaced on first sign-in, and the account is stored in PostgreSQL.</p>
-            <input value={supervisorName} onChange={(e) => setSupervisorName(e.target.value)} required placeholder="Supervisor full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={supervisorEmail} onChange={(e) => setSupervisorEmail(e.target.value)} required type="email" placeholder="Supervisor email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={supervisorPassword} onChange={(e) => setSupervisorPassword(e.target.value)} required type="password" minLength={6} placeholder="Temporary supervisor password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <input value={supervisorPhone} onChange={(e) => setSupervisorPhone(e.target.value)} placeholder="Phone (optional)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <button disabled={orgBusy} className="bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
-              {orgBusy ? 'Saving...' : 'Create supervisor'}
-            </button>
-            <ul className="text-xs text-gray-600 space-y-1 pt-2">
-              {supervisors.map((person) => (
-                <li key={person.id}>{person.fullName} — {person.email}</li>
-              ))}
-            </ul>
-          </form>
-
-          <form onSubmit={saveInterpreter} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-3 lg:col-span-2">
-            <h3 className="text-sm font-bold text-gray-900">Add an interpreter</h3>
-            <p className="text-xs text-gray-500">The interpreter profile, sign-in, and temporary password are written to the database. They choose their own password the first time they sign in.</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <input value={intName} onChange={(e) => setIntName(e.target.value)} required placeholder="Full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intEmail} onChange={(e) => setIntEmail(e.target.value)} required type="email" placeholder="Email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intPassword} onChange={(e) => setIntPassword(e.target.value)} required type="password" minLength={6} placeholder="Temporary password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intPhone} onChange={(e) => setIntPhone(e.target.value)} placeholder="Phone" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intExtension} onChange={(e) => setIntExtension(e.target.value)} placeholder="Extension" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intLanguages} onChange={(e) => setIntLanguages(e.target.value)} required placeholder="Languages: amh, orm" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <input value={intCategories} onChange={(e) => setIntCategories(e.target.value)} required placeholder="Services: healthcare" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              <button disabled={orgBusy} className="bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
-                {orgBusy ? 'Saving...' : 'Save interpreter'}
-              </button>
-            </div>
-          </form>
-
           {(orgMessage || orgError) && (
             <p className={`lg:col-span-2 text-sm ${orgError ? 'text-red-700' : 'text-emerald-700'}`}>{orgError || orgMessage}</p>
           )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'interpreters' && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <form onSubmit={saveInterpreter} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+            <div>
+              <h3 className="text-base font-black text-slate-900">Add an interpreter</h3>
+              <p className="mt-1 text-xs text-slate-500">Create the interpreter profile and sign-in account.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input value={intName} onChange={(e) => setIntName(e.target.value)} required placeholder="Full name" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intEmail} onChange={(e) => setIntEmail(e.target.value)} required type="email" placeholder="Email" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intPassword} onChange={(e) => setIntPassword(e.target.value)} required type="password" minLength={6} placeholder="Temporary password" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intPhone} onChange={(e) => setIntPhone(e.target.value)} placeholder="Phone" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intExtension} onChange={(e) => setIntExtension(e.target.value)} placeholder="Extension" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intLanguages} onChange={(e) => setIntLanguages(e.target.value)} required placeholder="Languages: amh, orm" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+              <input value={intCategories} onChange={(e) => setIntCategories(e.target.value)} required placeholder="Services: healthcare" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm sm:col-span-2" />
+              <button disabled={orgBusy} className="sm:col-span-2 rounded-xl bg-purple-700 px-4 py-3 text-sm font-bold text-white hover:bg-purple-800 disabled:opacity-60 cursor-pointer">
+                {orgBusy ? 'Saving...' : 'Save interpreter'}
+              </button>
+            </div>
+            {orgError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{orgError}</p>}
+            {orgMessage && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{orgMessage}</p>}
+          </form>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-black text-slate-900">Interpreter registry</h3>
+            <div className="mt-3 space-y-2">
+              {interpreters.map((item) => (
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-900">{item.fullName}</p>
+                  <p className="mt-1 text-[11px] capitalize text-slate-500">{item.verificationState}</p>
+                </div>
+              ))}
+              {interpreters.length === 0 && <p className="text-xs text-slate-500">No interpreters registered.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'supervisors' && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <form onSubmit={registerSupervisor} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+            <div>
+              <h3 className="text-base font-black text-slate-900">Create a supervisor</h3>
+              <p className="mt-1 text-xs text-slate-500">Supervisors can manage organizations and interpreters.</p>
+            </div>
+            <input value={supervisorName} onChange={(e) => setSupervisorName(e.target.value)} required placeholder="Supervisor full name" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+            <input value={supervisorEmail} onChange={(e) => setSupervisorEmail(e.target.value)} required type="email" placeholder="Supervisor email" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+            <input value={supervisorPassword} onChange={(e) => setSupervisorPassword(e.target.value)} required type="password" minLength={6} placeholder="Temporary supervisor password" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+            <input value={supervisorPhone} onChange={(e) => setSupervisorPhone(e.target.value)} placeholder="Phone (optional)" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+            <button disabled={orgBusy} className="rounded-xl bg-purple-700 px-4 py-3 text-sm font-bold text-white hover:bg-purple-800 disabled:opacity-60 cursor-pointer">
+              {orgBusy ? 'Saving...' : 'Create supervisor'}
+            </button>
+            {orgError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{orgError}</p>}
+            {orgMessage && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{orgMessage}</p>}
+          </form>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-black text-slate-900">Supervisor accounts</h3>
+            <div className="mt-3 space-y-2">
+              {supervisors.map((person) => (
+                <div key={person.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-900">{person.fullName}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{person.email}</p>
+                </div>
+              ))}
+              {supervisors.length === 0 && <p className="text-xs text-slate-500">No supervisors registered.</p>}
+            </div>
+          </div>
         </div>
       )}
 
@@ -853,6 +967,7 @@ export const PlatformAdminPortal: React.FC<PlatformAdminPortalProps> = ({
           </div>
         </div>
       )}
+      </main>
 
       {/* Add Language Modal */}
       {showAddLang && (

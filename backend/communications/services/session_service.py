@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from django.db import transaction
 from django.utils import timezone
 
-from api.models import Account, InterpretationRequest
+from api.models import Account, InterpretationRequest, Interpreter
 from communications.models import InterpretationSession, SessionEvent, SessionParticipant
 from .room_service import RoomService
 
@@ -270,6 +270,10 @@ class SessionService:
             session.request.status = "completed"
             session.request.save(update_fields=["status", "updated_at"])
 
+        # Reset interpreter availability so they can receive new rings
+        if session.interpreter_account:
+            Interpreter.objects.filter(email__iexact=session.interpreter_account.email).update(availability="available")
+
         logger.info("Session %s completed (duration=%ds)", session.session_reference, session.duration_seconds)
         return session
 
@@ -308,6 +312,10 @@ class SessionService:
             session.request.status = "cancelled"
             session.request.cancellation_reason = reason
             session.request.save(update_fields=["status", "cancellation_reason", "updated_at"])
+
+        # Reset interpreter availability so they can receive new rings
+        if session.interpreter_account:
+            Interpreter.objects.filter(email__iexact=session.interpreter_account.email).update(availability="available")
 
         logger.info("Session %s cancelled by %s (reason: %s)", session.session_reference, user_id, reason)
         return session

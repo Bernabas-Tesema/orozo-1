@@ -8,7 +8,7 @@ from django.utils.html import format_html
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
-from .models import Account, InterpretationRequest, InterpretationSession, Interpreter, Language
+from .models import Account, InterpretationRequest, InterpretationSession, Interpreter, Language, Meeting, MeetingParticipant
 
 BADGE_COLORS = {
     "active": "#168b91",
@@ -135,6 +135,30 @@ class InterpretationSessionAdmin(ImportExportModelAdmin):
     list_filter = ("status", "service_category")
     search_fields = ("id", "request_reference", "client_name", "interpreter_name")
     list_per_page = 25
+
+    @admin.display(description="Status", ordering="status")
+    def status_badge(self, obj):
+        return badge(obj.status)
+
+
+@admin.register(Meeting)
+class MeetingAdmin(admin.ModelAdmin):
+    list_display = ("title", "creator_name", "communication_mode", "status_badge", "created_at")
+    list_filter = ("status", "communication_mode")
+    search_fields = ("title", "creator_name")
+    list_per_page = 25
+
+    @admin.display(description="Status", ordering="status")
+    def status_badge(self, obj):
+        return badge(obj.status)
+
+
+@admin.register(MeetingParticipant)
+class MeetingParticipantAdmin(admin.ModelAdmin):
+    list_display = ("account_name", "account_role", "role", "status_badge", "meeting")
+    list_filter = ("status", "role", "account_role")
+    search_fields = ("account_name", "meeting__title")
+    list_per_page = 30
 
     @admin.display(description="Status", ordering="status")
     def status_badge(self, obj):

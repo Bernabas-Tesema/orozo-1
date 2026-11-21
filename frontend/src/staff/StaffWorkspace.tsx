@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, LayoutDashboard } from 'lucide-react';
+import { BarChart3, LayoutDashboard, Video } from 'lucide-react';
 import type { PortalState } from '../shared/usePortal';
 import { InterpreterPortal } from './InterpreterPortal';
 import { OperationalReports } from './OperationalReports';
@@ -8,7 +8,13 @@ import { SupervisorWorkspace } from './SupervisorWorkspace';
 
 type StaffView = 'main' | 'reports';
 
-export function StaffWorkspace({ portal }: { portal: PortalState }) {
+export function StaffWorkspace({
+  portal,
+  onOpenCreateMeeting,
+}: {
+  portal: PortalState;
+  onOpenCreateMeeting?: () => void;
+}) {
   const [view, setView] = useState<StaffView>('main');
   const user = portal.currentUser;
   if (!user) return null;
@@ -27,6 +33,7 @@ export function StaffWorkspace({ portal }: { portal: PortalState }) {
           onToggleAvailability={portal.handleToggleAvailability}
           onRespondAssignment={portal.handleRespondAssignment}
           onJoinSession={(sessionId) => portal.setActiveSessionRoomId(sessionId)}
+          onTakeWaitingCall={portal.handleTakeWaitingCall}
         />
       </main>
     );
@@ -35,31 +42,44 @@ export function StaffWorkspace({ portal }: { portal: PortalState }) {
   return (
     <>
       {showReports && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-            <button
-              onClick={() => setView('main')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer ${
-                view === 'main' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>{user.role === 'supervisor' ? 'Coordinator Hub' : 'System Administration'}</span>
-            </button>
-            <button
-              onClick={() => setView('reports')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer ${
-                view === 'reports' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Operational statistics</span>
-            </button>
+        <div className="mx-auto max-w-[1380px] px-4 sm:px-6 lg:px-8 pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                onClick={() => setView('main')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer ${
+                  view === 'main' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>{user.role === 'supervisor' ? 'Coordinator Hub' : 'System Administration'}</span>
+              </button>
+              <button
+                onClick={() => setView('reports')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer ${
+                  view === 'reports' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Operational statistics</span>
+              </button>
+            </div>
+
+            {/* Start Meeting button — platform_admin only */}
+            {user.role === 'platform_admin' && onOpenCreateMeeting && (
+              <button
+                onClick={onOpenCreateMeeting}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow cursor-pointer transition-all"
+              >
+                <Video className="w-4 h-4" />
+                Start Meeting
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-[1380px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {view === 'reports' && showReports ? (
           <OperationalReports />
         ) : (
@@ -91,6 +111,7 @@ export function StaffWorkspace({ portal }: { portal: PortalState }) {
                 onVerifyInterpreter={portal.handleVerifyInterpreter}
                 onUpdateSettings={portal.handleUpdateSettings}
                 onAccountsCreated={portal.refreshData}
+                onOpenOperationalReports={() => setView('reports')}
               />
             )}
           </>

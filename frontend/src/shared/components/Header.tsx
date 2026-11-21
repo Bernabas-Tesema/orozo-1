@@ -84,9 +84,8 @@ export const Header: React.FC<HeaderProps> = ({
   const badge = getRoleBadge(currentUser.role, currentUser);
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-xs">
-      {/* Crisp Blue Brand Header Bar */}
-      <div className="h-1 w-full bg-blue-600" />
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+      <div className="h-0.5 w-full bg-gradient-to-r from-[#6D4AFF] via-violet-400 to-[#F59E0B]" />
 
       {/* Active Session Global Alert Banner */}
       {activeSessionId && (
@@ -112,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Platform Name */}
           <div className="flex items-center space-x-3">

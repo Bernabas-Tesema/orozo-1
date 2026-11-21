@@ -25,5 +25,5 @@ COPY . .
 # Expose Django port
 EXPOSE 8000
 
-# Run migrations and start Django development server
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+# Run migrations and serve Django with a production WSGI server
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120"]

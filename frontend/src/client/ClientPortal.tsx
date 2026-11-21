@@ -144,13 +144,13 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         };
       case 'matching':
         return {
-          label: 'Matching...',
-          className: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
+          label: 'Ringing interpreters...',
+          className: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold animate-pulse',
         };
       case 'pending_coordinator':
         return {
-          label: 'In Coordinator Queue',
-          className: 'bg-purple-100 text-purple-800 border-purple-300 font-semibold',
+          label: 'Ringing interpreters...',
+          className: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold animate-pulse',
         };
       case 'unresolved':
         return {
@@ -304,17 +304,22 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                     {req.assignedInterpreterName ? `Interpreter: ${req.assignedInterpreterName}` : 'Waiting for an interpreter'}
                   </p>
                   <div className="mt-4 flex items-center gap-2">
-                    {req.status === 'assigned' && (
+                    {req.status === 'matching' && (
                       <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">
-                        Ringing the interpreter. Unanswered calls move to ORZO Support.
+                        Ringing interpreters…
                       </span>
                     )}
-                    {req.status === 'in_session' && req.activeSessionId && (
+                    {req.status === 'assigned' && !req.activeSessionId && (
+                      <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">
+                        Interpreter accepted — preparing the room…
+                      </span>
+                    )}
+                    {['assigned', 'in_session'].includes(req.status) && req.activeSessionId && (
                       <button
                         onClick={() => onJoinSession(req.activeSessionId!)}
                         className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
                       >
-                        Join
+                        Join call
                       </button>
                     )}
                     {req.status === 'completed' && req.activeSessionId && (
