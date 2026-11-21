@@ -1,0 +1,9 @@
+{
+  "id": "business",
+  "title": "Business",
+  "titleAm": "ንግድ",
+  "typicalUrgency": "standard",
+  "summary": "Contracts, banking, and commercial meetings.",
+  "practiceNote": "Schedule ahead when the meeting time is already fixed.",
+  "cover": "cover.jpg"
+}

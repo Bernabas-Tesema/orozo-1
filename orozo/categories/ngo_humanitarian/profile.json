@@ -1,0 +1,9 @@
+{
+  "id": "ngo_humanitarian",
+  "title": "Humanitarian",
+  "titleAm": "የእርዳታ ሥራ",
+  "typicalUrgency": "high",
+  "summary": "Camp intake, protection interviews, and aid distribution.",
+  "practiceNote": "If the dialect is uncertain, flag it unknown so a person reviews it.",
+  "cover": "cover.jpg"
+}

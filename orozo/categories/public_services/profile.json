@@ -1,0 +1,9 @@
+{
+  "id": "public_services",
+  "title": "Public service",
+  "titleAm": "ሕዝብ አገልግሎት",
+  "typicalUrgency": "standard",
+  "summary": "Civil registration, municipal counters, and kebele desks.",
+  "practiceNote": "Use this when staff and the resident do not share a working language.",
+  "cover": "cover.jpg"
+}

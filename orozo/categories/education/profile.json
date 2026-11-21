@@ -1,0 +1,9 @@
+{
+  "id": "education",
+  "title": "Education",
+  "titleAm": "ትምህርት",
+  "typicalUrgency": "standard",
+  "summary": "Enrollment, parent meetings, and classroom support.",
+  "practiceNote": "Use when the school language is not the family language.",
+  "cover": "cover.jpg"
+}
